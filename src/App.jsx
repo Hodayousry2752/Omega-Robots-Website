@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 import AppRoutes from "./routes/AppRoutes";
 import { AuthProvider } from "./context/AuthContext";
 import { MqttProvider } from "./context/MqttContext";
-import { BrowserRouter } from "react-router-dom";
+import { HashRouter } from "react-router-dom";
 import { useAuth } from "./context/AuthContext"; 
 import { useMqtt } from "./context/MqttContext"; 
 
@@ -84,13 +84,13 @@ function MqttStatusIndicator() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <MqttProvider>
           <AppRoutes />
           <Toaster position="top-center" richColors />
           <MqttStatusIndicator />
         </MqttProvider>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }

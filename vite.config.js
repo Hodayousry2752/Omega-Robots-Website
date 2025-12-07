@@ -15,7 +15,7 @@ export default defineConfig({
       },
     },
   },
-  base: "/RobotsWeb/",
+  base: "/Omega-Robots-Website/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

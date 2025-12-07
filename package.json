@@ -1,13 +1,14 @@
 {
   "name": "vite-project",
-  "homepage": "https://github.com/Mahmoudmohammed500/Robots-Website",
+  "homepage": "https://Hodayousry2752.github.io/Omega-Robots-Website",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
     "dev": "vite",
     "build": "vite build",
-    "deploy": "gh-pages -d dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },
