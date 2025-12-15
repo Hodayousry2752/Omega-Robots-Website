@@ -128,9 +128,9 @@ function AllUsers({ users, onDeleteClick, onDeleteAll }) {
                 <strong className="text-main-color">Phone:</strong>{" "}
                 {user.TelephoneNumber}
               </p>
-              <p className="text-sm text-gray-500 mb-2">
+              <p className="text-sm text-gray-500 mb-2 overflow-clip">
                 {" "}
-                <strong className="text-main-color">ُEmail:</strong>{" "}
+                <strong className="text-main-color">Email:</strong>{" "}
                 {user.Email}
               </p>
             </div>

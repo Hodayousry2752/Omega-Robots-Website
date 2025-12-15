@@ -325,9 +325,9 @@ export default function ScheduleDisplay({
           <div className="text-sm text-green-700">
             <strong>MQTT Connected:</strong> Using car section credentials
           </div>
-          <div className="text-xs text-green-600 mt-1">
+          {/* <div className="text-xs text-green-600 mt-1">
             Topic: {mqttCredentials.topic}
-          </div>
+          </div> */}
         </div>
       ) : (
         <div className="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">

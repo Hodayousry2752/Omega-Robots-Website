@@ -26,7 +26,7 @@ export default function Footer() {
                 <Phone size={18} className="text-second-color" />
               </div>
               <div className="flex flex-col text-left">
-                <span className="font-medium text-blue-600">Mobile:</span>
+                <span className="font-medium text-blue-800">Mobile:</span>
                 <span>+962 777970321</span>
                 <span>+962 798878411</span>
               </div>
@@ -61,24 +61,20 @@ export default function Footer() {
               <Mail size={18} />
             </motion.a>
 
-            {/* WhatsApp */}
+            {/* WhatsApp - باستخدام رابط صورة مباشر */}
             <motion.a
               href="https://api.whatsapp.com/send?phone=962790603862"
               target="_blank"
               rel="noopener noreferrer"
               whileHover={{ scale: 1.15 }}
-              className="p-2 rounded-full border border-second-color text-second-color hover:border-main-color hover:text-main-color transition-all duration-300"
+              className="p-2 rounded-full border border-second-color hover:border-main-color transition-all duration-300 flex items-center justify-center"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                fill="currentColor"
-                viewBox="0 0 16 16"
-              >
-                <path d="M13.601 2.326a7.875 7.875 0 0 0-11.045 0 7.875 7.875 0 0 0-2.311 5.572c0 1.394.386 2.767 1.119 3.963l-1.15 4.196 4.29-1.133a7.87 7.87 0 0 0 3.964 1.12h.003a7.875 7.875 0 0 0 5.572-2.311 7.875 7.875 0 0 0 0-11.045zM8 14.875a6.88 6.88 0 0 1-3.543-.986l-.25-.147-2.54.669.678-2.485-.164-.263A6.876 6.876 0 1 1 8 14.875z"/>
-                <path d="M11.154 10.846c-.155-.078-.917-.453-1.06-.506-.143-.052-.247-.078-.351.078-.104.155-.403.505-.494.607-.09.104-.18.116-.335.039-.155-.078-.65-.24-1.238-.76-.458-.409-.767-.915-.855-1.07-.088-.156-.009-.24.068-.317.07-.069.155-.18.232-.27.077-.09.103-.156.155-.26.052-.104.026-.195-.013-.273-.039-.078-.351-.844-.48-1.155-.127-.31-.257-.27-.351-.274-.09-.005-.195-.006-.3-.006s-.273.039-.416.195c-.143.156-.546.533-.546 1.3 0 .766.56 1.506.638 1.61.077.104 1.105 1.69 2.678 2.373 1.572.683 1.572.455 1.855.426.282-.03.916-.374 1.046-.734.13-.36.13-.668.091-.734-.039-.065-.143-.104-.3-.182z"/>
-              </svg>
+              {/* رابط صورة واتساب من الإنترنت */}
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+                alt="WhatsApp"
+                className="w-5 h-5 object-contain"
+              />
             </motion.a>
           </div>
 

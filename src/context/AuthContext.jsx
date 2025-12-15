@@ -6,7 +6,6 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState(null); 
-  const [accessToken, setAccessToken] = useState(null);
   const [projectName, setProjectName] = useState(null);
   const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +20,6 @@ export function AuthProvider({ children }) {
       if (token && role) {
         setIsAuthenticated(true);
         setUserRole(role);
-        setAccessToken(token);
         setProjectName(project || null);
         setUserName(name || null);
       } else if (role && !token) {
@@ -51,33 +49,69 @@ export function AuthProvider({ children }) {
     setProjectName(projectNameValue);
     setUserName(userNameValue);
 
-    const cookieOptions = { expires: 7 }; 
+    const cookieOptions = { expires: 365, path: '/' };
     
     Cookies.set("userRole", role, cookieOptions);
     Cookies.set("projectName", projectNameValue, cookieOptions);
     Cookies.set("userName", userNameValue, cookieOptions);
+    Cookies.set("accessToken", "dummy_token_" + Date.now(), cookieOptions);
+    
+    // حفظ في localStorage
+    try {
+      localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("userRole", role);
+      localStorage.setItem("userName", userNameValue);
+      localStorage.setItem("projectName", projectNameValue);
+      localStorage.setItem("loginTime", Date.now().toString());
+    } catch (error) {
+      console.error("Error saving to localStorage:", error);
+    }
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setUserRole(null);
-    setAccessToken(null);
     setProjectName(null);
     setUserName(null);
     
     clearAllCookies();
+    
+    // مسح localStorage (لكن نحتفظ ببيانات Remember Me والاقتراحات)
+    try {
+      localStorage.removeItem("isAuthenticated");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("projectName");
+      localStorage.removeItem("loginTime");
+      
+      // ملاحظة: نحتفظ بـ omega_remember_me و omega_saved_usernames
+      console.log("✅ Logout complete. Remember me data and suggestions preserved.");
+    } catch (error) {
+      console.error("Error clearing localStorage:", error);
+    }
+  };
+
+  // دالة لحذف جميع البيانات المحفوظة (للإعدادات المتقدمة)
+  const clearAllSavedData = () => {
+    try {
+      localStorage.removeItem("omega_remember_me");
+      localStorage.removeItem("omega_saved_usernames");
+      console.log("✅ All saved login data cleared");
+    } catch (error) {
+      console.error("Error clearing saved data:", error);
+    }
   };
 
   return (
     <AuthContext.Provider value={{ 
       isAuthenticated, 
       userRole, 
-      accessToken, 
       projectName,
       userName,
       isLoading,
       login, 
-      logout 
+      logout,
+      clearAllSavedData
     }}>
       {children}
     </AuthContext.Provider>

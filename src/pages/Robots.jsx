@@ -148,7 +148,7 @@ export default function Robots() {
           </motion.div>
         ) : (
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {robots.map((robot, index) => (
+            {[...robots].reverse().map((robot, index) => (
               <motion.div
                 key={robot.id || index}
                 initial={{ opacity: 0, y: 40 }}

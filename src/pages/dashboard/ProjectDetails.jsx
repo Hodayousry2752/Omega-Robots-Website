@@ -488,7 +488,7 @@ export default function ProjectDetails() {
       {/* Robots Grid */}
       {robots.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {robots.map((robot) => (
+          {[...robots].reverse().map((robot) => (
             <Card
               key={robot.id || Math.random()}
               className="overflow-hidden shadow-lg pt-0 hover:shadow-xl transition rounded-xl border border-gray-200"

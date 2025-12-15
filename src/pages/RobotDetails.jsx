@@ -475,7 +475,7 @@ export default function RobotDetails() {
       }, 2000);
     } else {
       console.log(`Failed to publish to robot ${topic}: ${btnName}`);
-      toast.error("Failed to send command via MQTT");
+      toast.error("Failed to send command via MQTT Check internet connection or contact support");
     }
   };
 
@@ -499,7 +499,7 @@ export default function RobotDetails() {
       }, 2000);
     } else {
       console.log(`Failed to publish to trolley ${topic}: ${btnName}`);
-      toast.error("Failed to send command via MQTT");
+      toast.error("Failed to send command via MQTT Check internet connection or contact support");
     }
   };
 
@@ -552,10 +552,10 @@ export default function RobotDetails() {
         <button
           key={btn?.id || i}
           onClick={() => sectionType === "main" ? handleRobotButtonClick(btnLabel) : handleTrolleyButtonClick(btnLabel)}
-          className="px-6 py-4 rounded-xl text-lg font-semibold text-white border shadow-lg transition-all duration-300 transform hover:scale-105 hover:opacity-90 min-w-[150px] sm:min-w-[180px] lg:min-w-[200px] cursor-pointer"
+          className="px-4 py-3 rounded-xl text-base font-semibold text-white border shadow-lg transition-all duration-300 transform hover:scale-105 hover:opacity-90 min-w-[120px] sm:min-w-[180px] lg:min-w-[200px] cursor-pointer text-center"
           style={{ backgroundColor: btnColor, borderColor: btnColor }}
         >
-          {btnLabel} ✓
+          {btnLabel} 
         </button>
       );
     });
@@ -610,7 +610,7 @@ export default function RobotDetails() {
 
         {mainSection.ActiveBtns && mainSection.ActiveBtns.length > 0 && (
           <div className="mb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 justify-items-center">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 justify-items-center">
               {getActiveButtons(mainSection, "main")}
             </div>
           </div>
@@ -668,7 +668,7 @@ export default function RobotDetails() {
         </div>
 
         {carSection.ActiveBtns && carSection.ActiveBtns.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 justify-items-center">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 justify-items-center">
             {getActiveButtons(carSection, "car")}
           </div>
         )}
