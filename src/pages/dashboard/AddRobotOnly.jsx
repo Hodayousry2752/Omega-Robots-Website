@@ -6,6 +6,8 @@ import { toast } from "react-hot-toast";
 import RobotMainPanel from "@/components/robots/RobotMainPanel";
 import { postData } from "@/services/postServices";
 
+import RobotImg from "../../assets/Robot1.jpg";
+
 export default function AddRobotOnly() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -15,7 +17,7 @@ export default function AddRobotOnly() {
   const [robot, setRobot] = useState({
     RobotName: "",
     Image: null,
-    imagePreview: null,
+    imagePreview: RobotImg, 
     projectId: id || "",
     isTrolley: false,
     Sections: {
@@ -34,11 +36,12 @@ export default function AddRobotOnly() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [isMainUnlocked, setIsMainUnlocked] = useState(false);
-  const [mainPassword, setMainPassword] = useState("");
+  // const [isMainUnlocked, setIsMainUnlocked] = useState(false);
+  // const [mainPassword, setMainPassword] = useState("");
 
-  const MAIN_PASSWORD = "#aoxns@343.";
+  // const MAIN_PASSWORD = "#aoxns@343.";
 
+  /*
   const handlePasswordSubmit = () => {
     if (mainPassword === MAIN_PASSWORD) {
       setIsMainUnlocked(true);
@@ -49,6 +52,7 @@ export default function AddRobotOnly() {
       setMainPassword("");
     }
   };
+  */
 
   const updateMainSection = (updates) => {
     const { Voltage, Cycles, Status, ...allowedUpdates } = updates;
@@ -79,6 +83,17 @@ export default function AddRobotOnly() {
     }));
   };
 
+  const convertImageUrlToFile = async (imageUrl, fileName) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      return new File([blob], fileName, { type: blob.type });
+    } catch (error) {
+      console.error("Error converting image to file:", error);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     if (!robot.RobotName.trim())
       return toast.error("Please enter a robot name!");
@@ -105,9 +120,18 @@ export default function AddRobotOnly() {
       
       fd.append("Sections", JSON.stringify(sectionsToSend));
 
-      // Append image file only if selected
       if (robot.Image) {
         fd.append("Image", robot.Image);
+      } else {
+        try {
+          const defaultImageFile = await convertImageUrlToFile(RobotImg, "Robot1.jpg");
+          if (defaultImageFile) {
+            fd.append("Image", defaultImageFile);
+            console.log("✅ Default image added to robot");
+          }
+        } catch (error) {
+          console.error("Failed to add default image:", error);
+        }
       }
 
       const res = await fetch(`${BASE_URL}/robots`, {
@@ -177,45 +201,57 @@ export default function AddRobotOnly() {
           </div>
 
           <div className="mt-5 space-y-6">
-            {!isMainUnlocked ? (
-              // Password Input Section
-              <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-semibold text-main-color mb-4">
-                  Enter the password to access the robot control{" "}
-                </h3>
-                <div className="flex gap-3 items-center">
-                  <input
-                    type="password"
-                    value={mainPassword}
-                    onChange={(e) => setMainPassword(e.target.value)}
-                    placeholder="Enter the password"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handlePasswordSubmit();
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={handlePasswordSubmit}
-                    className="bg-main-color text-white"
-                  >
-                    open
-                  </Button>
+            {/*
+              !isMainUnlocked ? (
+                // Password Input Section
+                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <h3 className="text-lg font-semibold text-main-color mb-4">
+                    Enter the password to access the robot control{" "}
+                  </h3>
+                  <div className="flex gap-3 items-center">
+                    <input
+                      type="password"
+                      value={mainPassword}
+                      onChange={(e) => setMainPassword(e.target.value)}
+                      placeholder="Enter the password"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          handlePasswordSubmit();
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handlePasswordSubmit}
+                      className="bg-main-color text-white"
+                    >
+                      open
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              // Main Control Section (Unlocked)
-              <RobotMainPanel
-                mainData={robot.Sections.main}
-                updateMainSection={updateMainSection}
-                robotName={robot.RobotName}
-                updateRobotName={updateRobotName}
-                imagePreview={robot.imagePreview}
-                updateImage={updateImage}
-                fixedFields={true}
-              />
-            )}
+              ) : (
+                // Main Control Section (Unlocked)
+                <RobotMainPanel
+                  mainData={robot.Sections.main}
+                  updateMainSection={updateMainSection}
+                  robotName={robot.RobotName}
+                  updateRobotName={updateRobotName}
+                  imagePreview={robot.imagePreview}
+                  updateImage={updateImage}
+                  fixedFields={true}
+                />
+              )
+            */}
+            
+            <RobotMainPanel
+              mainData={robot.Sections.main}
+              updateMainSection={updateMainSection}
+              robotName={robot.RobotName}
+              updateRobotName={updateRobotName}
+              imagePreview={robot.imagePreview}
+              updateImage={updateImage}
+              fixedFields={true}
+            />
           </div>
         </section>
       </div>

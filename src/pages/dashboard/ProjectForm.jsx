@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Upload, Save, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import ProjectImg from "../../assets/Robot1.jpg";
+
 export default function ProjectForm() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -19,7 +21,7 @@ export default function ProjectForm() {
     Location: "",
     Description: "",
     Image: null,
-    imagePreview: null,
+    imagePreview: editing ? null : ProjectImg, 
     existingImage: "", 
   });
 
@@ -68,6 +70,17 @@ export default function ProjectForm() {
     }
   };
 
+  const convertImageUrlToFile = async (imageUrl, fileName) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      return new File([blob], fileName, { type: blob.type });
+    } catch (error) {
+      console.error("Error converting image to file:", error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -84,6 +97,7 @@ export default function ProjectForm() {
       let url, options;
       
       if (editing) {
+        // تعديل مشروع موجود
         const payload = {
           id: id,
           ProjectName: formData.ProjectName || "",
@@ -98,6 +112,19 @@ export default function ProjectForm() {
         } else if (formData.existingImage) {
           payload.imageAction = "keep";
           payload.existingImage = formData.existingImage;
+        } else {
+          
+          try {
+            const defaultImageFile = await convertImageUrlToFile(ProjectImg, "Project1.jpg");
+            if (defaultImageFile) {
+              const base64Image = await convertToBase64(defaultImageFile);
+              payload.ImageBase64 = base64Image;
+              payload.imageAction = "update";
+              console.log("✅ Default image added to existing project");
+            }
+          } catch (error) {
+            console.error("Failed to add default image to existing project:", error);
+          }
         }
         
         url = `${BASE_URL}/projects.php/${id}`;
@@ -116,8 +143,19 @@ export default function ProjectForm() {
         fd.append("ProjectName", formData.ProjectName);
         fd.append("Location", formData.Location);
         fd.append("Description", formData.Description);
+        
         if (formData.Image) {
           fd.append("Image", formData.Image);
+        } else {
+          try {
+            const defaultImageFile = await convertImageUrlToFile(ProjectImg, "Project1.jpg");
+            if (defaultImageFile) {
+              fd.append("Image", defaultImageFile);
+              console.log("✅ Default image added to new project");
+            }
+          } catch (error) {
+            console.error("Failed to add default image to new project:", error);
+          }
         }
         
         url = `${BASE_URL}/projects.php`;
@@ -179,7 +217,7 @@ export default function ProjectForm() {
     setFormData({
       ...formData,
       Image: null,
-      imagePreview: null,
+      imagePreview: ProjectImg,
     });
   };
 
@@ -225,7 +263,9 @@ export default function ProjectForm() {
                 />
                 <div className="flex justify-between items-center mt-2">
                   <p className="text-sm text-gray-600">
-                    {formData.Image ? "New image selected" : "Current image"}
+                    {formData.Image 
+                      ? "New image selected" 
+                      : (formData.existingImage ? "Current image" : "Default image")}
                   </p>
                   {formData.Image && (
                     <Button
@@ -246,7 +286,9 @@ export default function ProjectForm() {
                 <Upload size={40} className="mx-auto mb-3" />
                 <p>Upload project image</p>
                 <p className="text-sm text-gray-500 mt-2">
-                  {editing ? "(Leave empty to keep current image)" : "(Optional)"}
+                  {editing 
+                    ? "(Leave empty to keep current image or use default)" 
+                    : "(Will use default image if not uploaded)"}
                 </p>
               </div>
             )}
@@ -311,7 +353,7 @@ export default function ProjectForm() {
             </div>
 
             <div className="pt-4 flex flex-col gap-4">
-             
+              
               
               <div className="flex justify-end gap-4">
                 <Button

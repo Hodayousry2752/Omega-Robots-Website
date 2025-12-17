@@ -125,11 +125,14 @@ function AllUsers({ users, onDeleteClick, onDeleteAll }) {
                 {user.Password}
               </p>
               <p>
+                <strong className="text-main-color">Main Robot Password:</strong>{" "}
+                {user.mainrobot_password || "Not set"}
+              </p>
+              <p>
                 <strong className="text-main-color">Phone:</strong>{" "}
                 {user.TelephoneNumber}
               </p>
               <p className="text-sm text-gray-500 mb-2 overflow-clip">
-                {" "}
                 <strong className="text-main-color">Email:</strong>{" "}
                 {user.Email}
               </p>

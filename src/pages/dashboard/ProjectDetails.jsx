@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getData } from "@/services/getServices";
 import { deleteData } from "@/services/deleteServices";
-import RobotImg from "../../assets/Robot1.jpeg";
+import RobotImg from "../../assets/Robot1.jpg";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import mqtt from "mqtt"; // Import MQTT directly
@@ -285,7 +285,7 @@ export default function ProjectDetails() {
       hour12: false,
     });
 
-    const message = `set_time_${dateString.replace(/\//g, "-")}_${timeString.replace(/:/g, "-")}`;
+    const message = `set_time_${dateString.replace(/\//g, "_")}_${timeString.replace(/:/g, "_")}`;
 
     let results = {
       mainTopics: 0,

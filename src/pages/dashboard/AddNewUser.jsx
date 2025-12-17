@@ -19,6 +19,7 @@ export default function AddUser() {
     Username: "",
     Email: "",
     Password: "",
+    mainrobot_password: "",
     TelephoneNumber: "",
     ProjectName: "",
   });
@@ -40,6 +41,7 @@ export default function AddUser() {
             Username: userData.Username || "",
             Email: userData.Email || "",
             Password: userData.Password || "",
+            mainrobot_password: userData.mainrobot_password || "",
             TelephoneNumber: userData.TelephoneNumber || "",
             ProjectName: userData.ProjectName || "",
           });
@@ -219,6 +221,21 @@ export default function AddUser() {
                     }
                     className="h-12 border-gray-300 focus:border-main-color focus:ring-main-color rounded-xl"
                     required={!id}
+                  />
+                </div>
+
+                {/* Main Robot Password */}
+                <div className="flex flex-col space-y-2 sm:col-span-2">
+                  <Label htmlFor="mainrobot_password" className="text-gray-700 font-medium">
+                    Main Robot Password
+                  </Label>
+                  <Input
+                    id="mainrobot_password"
+                    type="text"
+                    value={formData.mainrobot_password}
+                    onChange={handleChange}
+                    placeholder="Enter main robot password"
+                    className="h-12 border-gray-300 focus:border-main-color focus:ring-main-color rounded-xl"
                   />
                 </div>
 

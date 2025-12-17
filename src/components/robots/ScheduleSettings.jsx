@@ -5,7 +5,7 @@ import {getData } from "@/services/getServices";
 import { postData} from "@/services/postServices";
 import { useParams } from "react-router-dom";
 import mqtt from "mqtt";
-import { toast } from "sonner"; // Added import for toast
+import { toast } from "sonner";
 
 // Function to publish message with specific credentials
 const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic, message) => {
@@ -56,7 +56,7 @@ export default function ScheduleSettings({
   const [robotData, setRobotData] = useState(null);
   const [robotLoading, setRobotLoading] = useState(true);
   
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Nun"];
   const size = 200;
   const radius = size / 2 - 20;
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -139,13 +139,28 @@ export default function ScheduleSettings({
   };
 
   const toggleDay = (d) => {
-    const next = schedule.days.includes(d)
-      ? schedule.days.filter((x) => x !== d)
-      : [...schedule.days, d];
-    setSchedule({ ...schedule, days: next });
+    if (d === "Nun") {
+      // When Nun is selected, set everything to zeros
+      setSchedule({ 
+        days: ["Nun"], 
+        hour: 0, 
+        minute: 0 
+      });
+    } else {
+      // When any other day is selected, remove Nun if present
+      const next = schedule.days.includes(d)
+        ? schedule.days.filter((x) => x !== d)
+        : [...schedule.days.filter(x => x !== "Nun"), d];
+      setSchedule({ ...schedule, days: next });
+    }
   };
 
   const handleClickClock = (e, type) => {
+    if (schedule.days.includes("Nun")) {
+      toast.info("'Nun' mode is selected. Time is set to 00:00");
+      return;
+    }
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -165,17 +180,18 @@ export default function ScheduleSettings({
   };
 
   const getDaysAsBinaryString = () => {
-    return days.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
+    if (schedule.days.includes("Nun")) {
+      return "0_0_0_0_0_0_0_0";
+    } else {
+      const regularDays = days.slice(0, 7);
+      const regularBinary = regularDays.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
+      return `${regularBinary}_0`;
+    }
   };
 
   const handleSaveAndSendSchedule = async () => {
     if (!robotId) {
       toast.error("RobotId is missing!");
-      return;
-    }
-    
-    if (!schedule.days.length) {
-      toast.error("Please select at least one day");
       return;
     }
     
@@ -192,8 +208,16 @@ export default function ScheduleSettings({
       let mqttSuccess = false;
       if (mqttCredentials && mqttCredentials.mqttUrl && mqttCredentials.mqttUsername && mqttCredentials.mqttPassword && mqttCredentials.topic) {
         try {
-          const timeString = `${String(schedule.hour).padStart(2, "0")}_${String(schedule.minute).padStart(2, "0")}`;
-          const daysBinaryString = getDaysAsBinaryString();
+          let timeString, daysBinaryString;
+          
+          if (schedule.days.includes("Nun")) {
+            timeString = "00_00";
+            daysBinaryString = "0_0_0_0_0_0_0_0";
+          } else {
+            timeString = `${String(schedule.hour).padStart(2, "0")}_${String(schedule.minute).padStart(2, "0")}`;
+            daysBinaryString = getDaysAsBinaryString();
+          }
+          
           const message = `schedule_${timeString}_${daysBinaryString}`;
           
           await publishWithCredentials(
@@ -208,18 +232,22 @@ export default function ScheduleSettings({
           console.log(`Schedule sent via MQTT: ${message} to topic: ${mqttCredentials.topic}`);
         } catch (mqttError) {
           console.error("MQTT publish failed:", mqttError);
-          // Continue with button creation even if MQTT fails
         }
       }
 
       // Create/update button in database
-      const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
-      const btnName = `schedule_${schedule.hour}_${schedule.minute}_${dayFlags.join("_")}`;
+      let btnName;
+      if (schedule.days.includes("Nun")) {
+        btnName = `schedule_00_00_0_0_0_0_0_0_0_0`;
+      } else {
+        const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
+        btnName = `schedule_${schedule.hour}_${schedule.minute}_${dayFlags.join("_")}`;
+      }
 
       const newButton = {
         BtnName: btnName,
         RobotId: parseInt(robotId),
-        Color: "#0d9488",
+        Color: schedule.days.includes("Nun") ? "#ef4444" : "#0d9488",
         Operation: "/start",
         projectId: projectId,
       };
@@ -259,7 +287,6 @@ export default function ScheduleSettings({
 
   return (
     <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm relative group">
-      {/* Visibility Toggle Button - Top Right Corner */}
       <button
         onClick={() => updateScheduleVisibility(!isVisible)}
         disabled={updatingVisibility}
@@ -290,7 +317,7 @@ export default function ScheduleSettings({
       {mqttCredentials ? (
         <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
           <div className="text-sm text-green-700">
-            <strong>MQTT Connected:</strong> Using car section credentials
+            <strong>MQTT Connected:</strong> Using trolley section credentials
           </div>
           <div className="text-xs text-green-600 mt-1">
             Topic: {mqttCredentials.topic}
@@ -312,7 +339,9 @@ export default function ScheduleSettings({
             onClick={() => toggleDay(d)}
             className={`px-3 py-2 rounded-md text-sm ${
               schedule.days.includes(d)
-                ? "bg-main-color text-white"
+                ? d === "Nun" 
+                  ? "bg-red-500 text-white" 
+                  : "bg-main-color text-white"
                 : "bg-white border border-gray-200 text-gray-700"
             }`}
           >
@@ -321,12 +350,22 @@ export default function ScheduleSettings({
         ))}
       </div>
 
+      {schedule.days.includes("Nun") && (
+        <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="text-sm text-red-700 flex items-center">
+            <strong>⚠️ "Nun" Mode Active:</strong> 
+            <span className="ml-2">Schedule will be sent with all zeros (00:00, 0_0_0_0_0_0_0_0)</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex max-md:flex-wrap gap-6 items-center">
         <svg
           width={size}
           height={size}
           onClick={(e) => handleClickClock(e, "minute")}
           className="cursor-pointer"
+          style={{ opacity: schedule.days.includes("Nun") ? 0.5 : 1 }}
         >
           <circle
             cx={size / 2}
@@ -388,6 +427,10 @@ export default function ScheduleSettings({
         <div className="flex flex-col gap-2">
           <div className="text-gray-700 font-medium">
             Selected Time: {String(schedule.hour).padStart(2, "0")}:{String(schedule.minute).padStart(2, "0")}
+            <br />
+            <span className="text-sm text-gray-500">
+              ( UTC+3)
+            </span>
           </div>
           <div className="flex gap-2 items-center">
             <label className="text-sm text-gray-600">Hour:</label>
@@ -400,6 +443,7 @@ export default function ScheduleSettings({
                 setSchedule({ ...schedule, hour: Math.max(0, Math.min(23, Number(e.target.value))) })
               }
               className="border rounded-lg p-1 w-16"
+              disabled={schedule.days.includes("Nun")}
             />
           </div>
           <div className="flex gap-2 items-center">
@@ -414,6 +458,7 @@ export default function ScheduleSettings({
                 setSchedule({ ...schedule, minute: Math.max(0, Math.min(59, Number(e.target.value))) })
               }
               className="border rounded-lg p-1 w-16"
+              disabled={schedule.days.includes("Nun")}
             />
           </div>
         </div>
@@ -423,20 +468,24 @@ export default function ScheduleSettings({
         <div className="text-sm text-gray-600">
           Current:{" "}
           <span className="font-medium">
-            {schedule.days.length ? schedule.days.join(", ") : "—"} @ {String(schedule.hour).padStart(2, "0")}:
+            {schedule.days.includes("Nun") 
+              ? "Nun (All zeros)" 
+              : schedule.days.length 
+                ? schedule.days.join(", ") 
+                : "—"} @ {String(schedule.hour).padStart(2, "0")}:
             {String(schedule.minute).padStart(2, "0")}
           </span>
           <br />
           <span className="text-xs text-gray-500">
-            Binary: {getDaysAsBinaryString()} (Mon-Sun)
+            Binary: {getDaysAsBinaryString()} (Mon-Sun-Nun)
           </span>
         </div>
         <Button 
           onClick={handleSaveAndSendSchedule} 
           disabled={saving || publishing} 
-          className="bg-second-color text-white"
+          className={`${schedule.days.includes("Nun") ? 'bg-red-500 hover:bg-red-600' : 'bg-second-color'} text-white`}
         >
-          {saving || publishing ? "Saving..." : "Schedule"}
+          {saving || publishing ? "Saving..." : schedule.days.includes("Nun") ? "Set Nun Schedule" : "Schedule"}
         </Button>
       </div>
     </div>

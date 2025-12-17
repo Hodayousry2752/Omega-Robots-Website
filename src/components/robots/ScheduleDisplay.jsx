@@ -4,7 +4,7 @@ import { getData } from "@/services/getServices";
 import { postData} from "@/services/postServices";
 import { useParams } from "react-router-dom";
 import mqtt from "mqtt";
-import { toast } from "sonner"; // Added import for toast
+import { toast } from "sonner";
 
 // Function to publish message with specific credentials
 const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic, message) => {
@@ -48,7 +48,7 @@ export default function ScheduleDisplay({
   loading = false
 }) {
   const { id: robotId } = useParams();
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Nun"];
   const [schedule, setSchedule] = useState({ days: [], hour: "", minute: 0, active: true });
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -127,7 +127,7 @@ export default function ScheduleDisplay({
     try {
       const parts = btnName.split('_');
       
-      if (parts.length < 10 || parts[0] !== 'schedule') {
+      if (parts.length < 11 || parts[0] !== 'schedule') {
         console.warn('Invalid schedule format:', btnName);
         return null;
       }
@@ -135,7 +135,7 @@ export default function ScheduleDisplay({
       return {
         hour: parseInt(parts[1]),
         minute: parseInt(parts[2]),
-        daysBinary: parts.slice(3, 10).join(''),
+        daysBinary: parts.slice(3, 11).join(''),
         rawData: btnName
       };
     } catch (error) {
@@ -145,10 +145,10 @@ export default function ScheduleDisplay({
   };
 
   const getActiveDaysFromBinary = (binaryString) => {
-    if (!binaryString || binaryString.length !== 7) return [];
+    if (!binaryString || binaryString.length !== 8) return [];
     
     const activeDays = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) {
       if (binaryString[i] === '1') {
         activeDays.push(days[i]);
       }
@@ -157,17 +157,37 @@ export default function ScheduleDisplay({
   };
 
   const getDaysAsBinaryString = () => {
-    return days.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
+    if (schedule.days.includes("Nun")) {
+      return "0_0_0_0_0_0_0_0";
+    } else {
+      return days.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
+    }
   };
 
   const toggleDay = (d) => {
-    const next = schedule.days.includes(d)
-      ? schedule.days.filter((x) => x !== d)
-      : [...schedule.days, d];
-    setSchedule({ ...schedule, days: next });
+    if (d === "Nun") {
+      // When Nun is selected, set everything to zeros
+      setSchedule({ 
+        days: ["Nun"], 
+        hour: "0", 
+        minute: 0,
+        active: true
+      });
+    } else {
+      // When any other day is selected, remove Nun if present
+      const next = schedule.days.includes(d)
+        ? schedule.days.filter((x) => x !== d)
+        : [...schedule.days.filter(x => x !== "Nun"), d];
+      setSchedule({ ...schedule, days: next });
+    }
   };
 
   const handleClickClock = (e, type) => {
+    if (schedule.days.includes("Nun")) {
+      toast.info("'Nun' mode is selected. Time is set to 00:00");
+      return;
+    }
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -193,6 +213,11 @@ export default function ScheduleDisplay({
   };
 
   const handleHourChange = (e) => {
+    if (schedule.days.includes("Nun")) {
+      toast.info("'Nun' mode is selected. Time is set to 00:00");
+      return;
+    }
+    
     const value = e.target.value;
     
     if (value === "" || /^\d+$/.test(value)) {
@@ -203,6 +228,8 @@ export default function ScheduleDisplay({
   };
 
   const handleHourBlur = (e) => {
+    if (schedule.days.includes("Nun")) return;
+    
     const value = e.target.value;
     
     if (value && isValidHour(value)) {
@@ -222,29 +249,26 @@ export default function ScheduleDisplay({
       return;
     }
 
-    if (!schedule.hour || schedule.hour === "") {
-      toast.error("Please enter the hour");
-      return;
-    }
-
-    if (!isValidHour(schedule.hour)) {
-      toast.error("Please enter a valid hour (0-23)");
-      return;
-    }
-
     try {
       setSaving(true);
       setPublishing(true);
-
-      const hourNum = parseInt(schedule.hour);
-      const hour24 = String(hourNum).padStart(2, "0");
 
       // Send via MQTT if credentials are available
       let mqttSuccess = false;
       if (mqttCredentials && mqttCredentials.mqttUrl && mqttCredentials.mqttUsername && mqttCredentials.mqttPassword && mqttCredentials.topic) {
         try {
-          const timeString = `${hour24}_${String(schedule.minute).padStart(2, "0")}`;
-          const daysBinaryString = getDaysAsBinaryString();
+          let timeString, daysBinaryString;
+          
+          if (schedule.days.includes("Nun")) {
+            timeString = "00_00";
+            daysBinaryString = "0_0_0_0_0_0_0_0";
+          } else {
+            const hourNum = parseInt(schedule.hour) || 0;
+            const hour24 = String(hourNum).padStart(2, "0");
+            timeString = `${hour24}_${String(schedule.minute).padStart(2, "0")}`;
+            daysBinaryString = getDaysAsBinaryString();
+          }
+          
           const message = `schedule_${timeString}_${daysBinaryString}`;
           
           await publishWithCredentials(
@@ -259,19 +283,26 @@ export default function ScheduleDisplay({
           console.log(`Schedule sent via MQTT: ${message} to topic: ${mqttCredentials.topic}`);
         } catch (mqttError) {
           console.error("MQTT publish failed:", mqttError);
-          // Continue with button update even if MQTT fails
         }
       }
 
       // Update button in database
       if (scheduleButton?.id) {
-        const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
-        const btnName = `schedule_${hour24}_${String(schedule.minute).padStart(2, "0")}_${dayFlags.join("_")}`;
+        let btnName;
+        
+        if (schedule.days.includes("Nun")) {
+          btnName = `schedule_00_00_0_0_0_0_0_0_0_0`;
+        } else {
+          const hourNum = parseInt(schedule.hour) || 0;
+          const hour24 = String(hourNum).padStart(2, "0");
+          const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
+          btnName = `schedule_${hour24}_${String(schedule.minute).padStart(2, "0")}_${dayFlags.join("_")}`;
+        }
 
         const updatedButton = {
           ...scheduleButton,
           BtnName: btnName,
-          Color: "#0d9488",
+          Color: schedule.days.includes("Nun") ? "#ef4444" : "#0d9488",
           Operation: "/start",
         };
 
@@ -279,14 +310,14 @@ export default function ScheduleDisplay({
       }
       
       const successMessage = mqttSuccess 
-        ? "Schedule sent successfully via MQTT"
-        : "Schedule sent successfully";
+        ? "Schedule sent successfully"
+        : "";
       
       toast.success(successMessage);
       
     } catch (err) {
-      console.error("Failed to save schedule:", err);
-      toast.error("Failed to save schedule");
+      console.error("Failed to set schedule:", err);
+      toast.error("Failed to set schedule");
     } finally {
       setSaving(false);
       setPublishing(false);
@@ -312,7 +343,7 @@ export default function ScheduleDisplay({
     );
   }
 
-  const displayHour = schedule.hour === "" ? "" : schedule.hour;
+  const displayHour = schedule.days.includes("Nun") ? "00" : (schedule.hour === "" ? "" : schedule.hour);
   const displayMinute = String(schedule.minute).padStart(2, "0");
 
   return (
@@ -320,14 +351,11 @@ export default function ScheduleDisplay({
       <h4 className="text-md font-semibold text-main-color mb-3">Schedule Settings</h4>
 
       {/* MQTT Status */}
-      {mqttCredentials ? (
+      {/* {mqttCredentials ? (
         <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
           <div className="text-sm text-green-700">
-            <strong>MQTT Connected:</strong> Using car section credentials
+            <strong>MQTT Connected:</strong> Using trolley section credentials
           </div>
-          {/* <div className="text-xs text-green-600 mt-1">
-            Topic: {mqttCredentials.topic}
-          </div> */}
         </div>
       ) : (
         <div className="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -335,7 +363,7 @@ export default function ScheduleDisplay({
             <strong>MQTT Not Configured:</strong> No car section MQTT credentials found
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Days */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -345,7 +373,9 @@ export default function ScheduleDisplay({
             onClick={() => toggleDay(d)}
             className={`px-3 py-2 rounded-md text-sm ${
               schedule.days.includes(d)
-                ? "bg-main-color text-white"
+                ? d === "Nun" 
+                  ? "bg-red-500 text-white" 
+                  : "bg-main-color text-white"
                 : "bg-white border border-gray-200 text-gray-700"
             }`}
           >
@@ -354,12 +384,21 @@ export default function ScheduleDisplay({
         ))}
       </div>
 
+      {schedule.days.includes("Nun") && (
+        <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="text-sm text-red-700">
+            <strong>⚠️ "Nun" Mode Active:</strong> Schedule will be sent with all zeros
+          </div>
+        </div>
+      )}
+
       <div className="flex max-md:flex-wrap gap-6 items-center">
         <svg
           width={size}
           height={size}
           onClick={(e) => handleClickClock(e, "minute")}
           className="cursor-pointer"
+          style={{ opacity: schedule.days.includes("Nun") ? 0.5 : 1 }}
         >
           <circle
             cx={size / 2}
@@ -423,7 +462,7 @@ export default function ScheduleDisplay({
             Selected Time: {displayHour || "__"}:{displayMinute}
             <br />
             <span className="text-sm text-gray-500">
-              (24-hour format, enter 0-23)
+              (24-hour format, enter 0-23) (UTC+3)
             </span>
           </div>
           <div className="flex gap-2 items-center">
@@ -434,11 +473,12 @@ export default function ScheduleDisplay({
               pattern="[0-9]*"
               maxLength="2"
               placeholder="00"
-              value={schedule.hour}
+              value={schedule.days.includes("Nun") ? "00" : schedule.hour}
               onChange={handleHourChange}
               onBlur={handleHourBlur}
               className="border rounded-lg p-1 w-16 text-center"
               title="Enter hour (0-23)"
+              disabled={schedule.days.includes("Nun")}
             />
           </div>
           <div className="flex gap-2 items-center">
@@ -450,10 +490,12 @@ export default function ScheduleDisplay({
               step="5"
               value={schedule.minute}
               onChange={(e) => {
+                if (schedule.days.includes("Nun")) return;
                 const value = Math.max(0, Math.min(59, Number(e.target.value)));
                 setSchedule({ ...schedule, minute: value });
               }}
               className="border rounded-lg p-1 w-16 text-center"
+              disabled={schedule.days.includes("Nun")}
             />
           </div>
           <div className="text-xs text-gray-500 mt-1">
@@ -471,16 +513,20 @@ export default function ScheduleDisplay({
         <div className="text-sm text-gray-600">
           Current:{" "}
           <span className="font-medium">
-            {schedule.days.length ? schedule.days.join(", ") : "—"} @ {displayHour || "__"}:
+            {schedule.days.includes("Nun") 
+              ? "Nun (All zeros)" 
+              : schedule.days.length 
+                ? schedule.days.join(", ") 
+                : "—"} @ {displayHour || "__"}:
             {displayMinute}
           </span>
         </div>
         <Button 
           onClick={handleSaveAndSendSchedule} 
-          disabled={saving || publishing || !schedule.days.length || !schedule.hour || !isValidHour(schedule.hour)}
-          className="bg-second-color text-white"
+          disabled={saving || publishing || !schedule.days.length}
+          className={`${schedule.days.includes("Nun") ? 'bg-red-500 hover:bg-red-600' : 'bg-second-color'} text-white`}
         >
-          {saving || publishing ? "Saving..." : "Send Schedule"}
+          {saving || publishing ? "Saving..." : schedule.days.includes("Nun") ? "Set Nun Schedule" : "Set Schedule"}
         </Button>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { postData } from "@/services/postServices";
 import RobotMainPanel from "@/components/robots/RobotMainPanel";
 import RobotTrolleyPanel from "@/components/robots/RobotTrolleyPanel";
+import RobotImg from "../../assets/Robot1.jpg";
 
 export default function AddRobotWithTrolley() {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function AddRobotWithTrolley() {
   const [robot, setRobot] = useState({
     RobotName: "",
     Image: null,
-    imagePreview: null,
+    imagePreview: RobotImg, 
     Sections: {
       main: {
         Voltage: "0",
@@ -49,6 +50,7 @@ export default function AddRobotWithTrolley() {
     },
   });
 
+  /*
   const [isMainUnlocked, setIsMainUnlocked] = useState(false);
   const [mainPassword, setMainPassword] = useState("");
 
@@ -62,6 +64,18 @@ export default function AddRobotWithTrolley() {
     } else {
       toast.error("Incorrect password");
       setMainPassword("");
+    }
+  };
+  */
+
+  const convertImageUrlToFile = async (imageUrl, fileName) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      return new File([blob], fileName, { type: blob.type });
+    } catch (error) {
+      console.error("Error converting image to file:", error);
+      return null;
     }
   };
 
@@ -100,6 +114,16 @@ export default function AddRobotWithTrolley() {
 
       if (robot.Image) {
         fd.append("Image", robot.Image);
+      } else {
+        try {
+          const defaultImageFile = await convertImageUrlToFile(RobotImg, "Robot1.jpg");
+          if (defaultImageFile) {
+            fd.append("Image", defaultImageFile);
+            console.log("✅ Default image added to robot");
+          }
+        } catch (error) {
+          console.error("Failed to add default image:", error);
+        }
       }
 
       const res = await fetch(`${BASE_URL}/robots`, {
@@ -234,45 +258,58 @@ export default function AddRobotWithTrolley() {
           </div>
 
           <div className="mt-5 space-y-6">
-            {!isMainUnlocked ? (
-              // Password Input Section
-              <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-semibold text-main-color mb-4">
-                  Enter the password to access the robot control{" "}
-                </h3>
-                <div className="flex gap-3 items-center">
-                  <input
-                    type="password"
-                    value={mainPassword}
-                    onChange={(e) => setMainPassword(e.target.value)}
-                    placeholder="Enter the password"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handlePasswordSubmit();
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={handlePasswordSubmit}
-                    className="bg-main-color text-white"
-                  >
-                    open
-                  </Button>
+            {/*
+              !isMainUnlocked ? (
+                // Password Input Section
+                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <h3 className="text-lg font-semibold text-main-color mb-4">
+                    Enter the password to access the robot control{" "}
+                  </h3>
+                  <div className="flex gap-3 items-center">
+                    <input
+                      type="password"
+                      value={mainPassword}
+                      onChange={(e) => setMainPassword(e.target.value)}
+                      placeholder="Enter the password"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          handlePasswordSubmit();
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handlePasswordSubmit}
+                      className="bg-main-color text-white"
+                    >
+                      open
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              // Main Control Section (Unlocked)
-              <RobotMainPanel
-                mainData={robot.Sections.main}
-                updateMainSection={updateMainSection}
-                robotName={robot.RobotName}
-                updateRobotName={updateRobotName}
-                imagePreview={robot.imagePreview}
-                updateImage={updateImage}
-                fixedFields={true}
-              />
-            )}
+              ) : (
+                // Main Control Section (Unlocked)
+                <RobotMainPanel
+                  mainData={robot.Sections.main}
+                  updateMainSection={updateMainSection}
+                  robotName={robot.RobotName}
+                  updateRobotName={updateRobotName}
+                  imagePreview={robot.imagePreview}
+                  updateImage={updateImage}
+                  fixedFields={true}
+                />
+              )
+            */}
+            
+            {/* Main Control Section */}
+            <RobotMainPanel
+              mainData={robot.Sections.main}
+              updateMainSection={updateMainSection}
+              robotName={robot.RobotName}
+              updateRobotName={updateRobotName}
+              imagePreview={robot.imagePreview}
+              updateImage={updateImage}
+              fixedFields={true}
+            />
           </div>
         </section>
       </div>

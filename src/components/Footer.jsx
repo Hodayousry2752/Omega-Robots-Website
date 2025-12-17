@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mail, Phone, Globe2 } from "lucide-react";
+import { Mail, MessageCircle, Globe2 } from "lucide-react";
 import LogoImg from "../assets/logo omega-2022.png";
 
 export default function Footer() {
@@ -20,13 +20,18 @@ export default function Footer() {
           
           <h3 className="text-lg font-semibold text-blue-900 mb-5">Contact Us</h3>
           <ul className="space-y-4 text-sm text-blue-800">
-            {/* Phone */}
+            {/* Phone with WhatsApp image instead of phone icon */}
             <li className="flex justify-center md:justify-start gap-3">
               <div className="pt-1">
-                <Phone size={18} className="text-second-color" />
+                {/* WhatsApp image instead of Phone icon */}
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+                  alt="WhatsApp"
+                  className="w-5 h-5 object-contain"
+                />
               </div>
               <div className="flex flex-col text-left">
-                <span className="font-medium text-blue-800">Mobile:</span>
+                <span className="font-medium text-blue-800">Whatsapp:</span>
                 <span>+962 777970321</span>
                 <span>+962 798878411</span>
               </div>
@@ -39,7 +44,7 @@ export default function Footer() {
 
         {/* Socials + Copyright */}
         <div className="flex flex-col items-center md:items-start justify-between text-sm text-blue-800">
-          {/* Website + Email + WhatsApp */}
+          {/* Website + Email + WhatsApp icon */}
           <div className="flex justify-center md:justify-start gap-4 mb-5">
             {/* Website */}
             <motion.a
@@ -61,20 +66,15 @@ export default function Footer() {
               <Mail size={18} />
             </motion.a>
 
-            {/* WhatsApp - باستخدام رابط صورة مباشر */}
+            {/* WhatsApp icon - using Phone icon instead of WhatsApp image */}
             <motion.a
               href="https://api.whatsapp.com/send?phone=962790603862"
               target="_blank"
               rel="noopener noreferrer"
               whileHover={{ scale: 1.15 }}
-              className="p-2 rounded-full border border-second-color hover:border-main-color transition-all duration-300 flex items-center justify-center"
+              className="p-2 rounded-full border border-second-color text-second-color hover:border-main-color hover:text-main-color transition-all duration-300"
             >
-              {/* رابط صورة واتساب من الإنترنت */}
-              <img
-                src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
-                alt="WhatsApp"
-                className="w-5 h-5 object-contain"
-              />
+              <MessageCircle size={18} />
             </motion.a>
           </div>
 

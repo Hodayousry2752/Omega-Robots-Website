@@ -34,10 +34,8 @@ export default function Login() {
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-  // تحميل أسماء المستخدمين المحفوظة عند تحميل الصفحة
   useEffect(() => {
     if (!isLoading) {
-      // تحميل قائمة أسماء المستخدمين المحفوظة
       try {
         const savedUsers = localStorage.getItem("omega_saved_usernames");
         if (savedUsers) {
@@ -49,7 +47,6 @@ export default function Login() {
         console.error("Error loading saved usernames:", error);
       }
 
-      // تحميل بيانات Remember Me فقط إذا تم تفعيلها سابقاً
       try {
         const savedCredentials = localStorage.getItem("omega_remember_me");
         if (savedCredentials) {
@@ -62,7 +59,6 @@ export default function Login() {
         console.error("Error loading saved credentials:", error);
       }
 
-      // التحقق مما إذا كان المستخدم مسجل دخول بالفعل
       const savedAuth = localStorage.getItem("isAuthenticated");
       const savedRole = localStorage.getItem("userRole");
       const savedName = localStorage.getItem("userName");
@@ -78,7 +74,6 @@ export default function Login() {
     }
   }, [isLoading, login, navigate]);
 
-  // إغلاق الاقتراحات عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target) &&
@@ -93,40 +88,44 @@ export default function Login() {
     };
   }, []);
 
-  // فلترة الاقتراحات بناءً على ما يكتبه المستخدم
   useEffect(() => {
     if (username.trim() === "") {
-      setFilteredSuggestions(savedUsernames.slice(0, 5)); // عرض أول 5 اقتراحات فقط
+      setFilteredSuggestions(savedUsernames.slice(0, 5));
     } else {
       const filtered = savedUsernames.filter(user =>
         user.toLowerCase().includes(username.toLowerCase())
       );
-      setFilteredSuggestions(filtered.slice(0, 5)); // عرض أول 5 نتائج فقط
+      setFilteredSuggestions(filtered.slice(0, 5));
     }
   }, [username, savedUsernames]);
 
-  // دالة لحفظ اسم المستخدم في القائمة
   const saveUsernameToList = (username) => {
     if (!username || username.trim() === "") return;
     
     try {
       const usernameLower = username.toLowerCase();
       
-      // التحقق إذا كان الاسم موجوداً بالفعل
-      if (!savedUsernames.some(u => u.toLowerCase() === usernameLower)) {
+      const existingIndex = savedUsernames.findIndex(u => u.toLowerCase() === usernameLower);
+      
+      if (existingIndex === -1) {
         const updatedUsernames = [username, ...savedUsernames];
-        // حفظ أقصى 10 أسماء فقط
         const trimmedList = updatedUsernames.slice(0, 10);
         setSavedUsernames(trimmedList);
         localStorage.setItem("omega_saved_usernames", JSON.stringify(trimmedList));
         console.log("✅ Username added to suggestions:", username);
+      } else {
+        const updatedUsernames = [...savedUsernames];
+        updatedUsernames[existingIndex] = username;
+        const trimmedList = updatedUsernames.slice(0, 10);
+        setSavedUsernames(trimmedList);
+        localStorage.setItem("omega_saved_usernames", JSON.stringify(trimmedList));
+        console.log("✅ Username updated in suggestions:", username);
       }
     } catch (error) {
       console.error("Error saving username:", error);
     }
   };
 
-  // دالة لحفظ بيانات الاعتماد الكاملة
   const saveCredentials = (username, password) => {
     try {
       const credentials = {
@@ -141,7 +140,6 @@ export default function Login() {
     }
   };
 
-  // دالة لحذف بيانات الاعتماد المحفوظة
   const clearSavedCredentials = () => {
     try {
       localStorage.removeItem("omega_remember_me");
@@ -151,17 +149,15 @@ export default function Login() {
     }
   };
 
-  // دالة لاختيار اسم مستخدم من الاقتراحات
   const selectUsername = (selectedUsername) => {
     setUsername(selectedUsername);
     setShowSuggestions(false);
     
-    // محاولة تحميل كلمة المرور المحفوظة لهذا المستخدم
     try {
       const savedCredentials = localStorage.getItem("omega_remember_me");
       if (savedCredentials) {
         const credentials = JSON.parse(savedCredentials);
-        if (credentials && credentials.username === selectedUsername) {
+        if (credentials && credentials.username.toLowerCase() === selectedUsername.toLowerCase()) {
           setPassword(credentials.password);
           setRememberMe(true);
           toast.info("Password loaded from saved credentials");
@@ -175,7 +171,6 @@ export default function Login() {
     }
   };
 
-  // دالة لحذف اسم مستخدم من الاقتراحات
   const removeUsername = (usernameToRemove) => {
     const updatedUsernames = savedUsernames.filter(u => u !== usernameToRemove);
     setSavedUsernames(updatedUsernames);
@@ -183,7 +178,6 @@ export default function Login() {
     toast.info(`"${usernameToRemove}" removed from suggestions`);
   };
 
-  // دالة لمسح جميع الاقتراحات
   const clearAllSuggestions = () => {
     if (window.confirm("Are you sure you want to clear all saved usernames?")) {
       setSavedUsernames([]);
@@ -207,96 +201,81 @@ export default function Login() {
     
     setLoading(true);
 
+    const originalUsername = username.trim();
+
     try {
-      // إرسال طلب الدخول
-      const data = await postData(`${BASE_URL}/login`, {
-        username: username,
-        password,
-      });
+      const loginAttempts = [
+        { username: username, description: "as entered" },
+        { username: username.toLowerCase(), description: "lowercase" },
+        { username: username.toUpperCase(), description: "uppercase" },
+        { username: username.charAt(0).toUpperCase() + username.slice(1).toLowerCase(), description: "title case" }
+      ];
 
-      if (data?.message === "Login successful" && data?.user) {
-        // استخراج البيانات
-        const userUsername = data.user.Username || data.user.username || username;
-        const userProjectName = data.user.ProjectName || "My Project";
-        
-        const displayUsername = username;
-        const isAdminUser = userUsername.toLowerCase().includes('admin');
-        const userRole = isAdminUser ? 'admin' : 'user';
-        
-        // تسجيل الدخول
-        login(userRole, userProjectName, displayUsername);
+      let loginSuccessful = false;
+      let userData = null;
+      let successfulUsername = "";
 
-        // حفظ اسم المستخدم في القائمة (حتى لو لم يختار Remember Me)
-        saveUsernameToList(username);
-
-        // إذا تم اختيار Remember Me، حفظ بيانات الاعتماد الكاملة
-        if (rememberMe) {
-          saveCredentials(username, password);
-          toast.info("Your credentials have been saved for future logins");
-        } else {
-          clearSavedCredentials();
+      for (const attempt of loginAttempts) {
+        try {
+          const data = await postData(`${BASE_URL}/login`, {
+            username: attempt.username,
+            password,
+          });
+          
+          if (data?.message === "Login successful" && data?.user) {
+            console.log(`✅ Login successful with ${attempt.description}: ${attempt.username}`);
+            userData = data.user;
+            successfulUsername = attempt.username;
+            loginSuccessful = true;
+            break;
+          }
+        } catch (error) {
+          console.log(`❌ Login failed with ${attempt.description}: ${attempt.username}`);
         }
+      }
 
-        // عرض رسالة الترحيب
-        if (isAdminUser) {
-          toast.success(`Welcome back, Admin ${displayUsername}!`);
-          navigate("/homeDashboard", { replace: true });
-        } else {
-          toast.success(`Welcome back, ${displayUsername}!`);
-          navigate("/robots", { replace: true });
-        }
+      if (loginSuccessful && userData) {
+        await handleSuccessfulLogin(
+          userData, 
+          originalUsername, 
+          successfulUsername, 
+          password
+        );
       } else {
         toast.error("Invalid username or password");
       }
     } catch (error) {
       console.error("Login error:", error);
-      
-      // محاولة مع lowercase إذا فشلت الأولى
-      if (error.response?.status === 401) {
-        try {
-          const data = await postData(`${BASE_URL}/login`, {
-            username: username.toLowerCase(),
-            password,
-          });
-          
-          if (data?.message === "Login successful" && data?.user) {
-            const userUsername = data.user.Username || data.user.username || username.toLowerCase();
-            const userProjectName = data.user.ProjectName || "My Project";
-            
-            const displayUsername = username;
-            const isAdminUser = userUsername.toLowerCase().includes('admin');
-            const userRole = isAdminUser ? 'admin' : 'user';
-            
-            login(userRole, userProjectName, displayUsername);
-
-            // حفظ اسم المستخدم في القائمة
-            saveUsernameToList(username);
-
-            // حفظ بيانات Remember Me إذا تم اختياره
-            if (rememberMe) {
-              saveCredentials(username, password);
-              toast.info("Your credentials have been saved");
-            } else {
-              clearSavedCredentials();
-            }
-
-            if (isAdminUser) {
-              toast.success(`Welcome back, Admin ${displayUsername}!`);
-              navigate("/homeDashboard", { replace: true });
-            } else {
-              toast.success(`Welcome back, ${displayUsername}!`);
-              navigate("/robots", { replace: true });
-            }
-            return;
-          }
-        } catch (secondError) {
-          toast.error("Invalid username or password");
-        }
-      } else {
-        toast.error(error.response?.data?.message || "Login failed. Please try again.");
-      }
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSuccessfulLogin = async (userData, displayUsername, actualUsername, actualPassword) => {
+    const userUsername = userData.Username || userData.username || actualUsername;
+    const userProjectName = userData.ProjectName || "My Project";
+    
+    const isAdminUser = userUsername.toLowerCase().includes('admin');
+    const userRole = isAdminUser ? 'admin' : 'user';
+    
+    login(userRole, userProjectName, displayUsername);
+
+    saveUsernameToList(displayUsername);
+
+    if (rememberMe) {
+      saveCredentials(displayUsername, actualPassword);
+      toast.info("Your credentials have been saved for future logins");
+    } else {
+      clearSavedCredentials();
+    }
+
+    if (isAdminUser) {
+      toast.success(`Welcome back, Admin ${displayUsername}!`);
+      navigate("/homeDashboard", { replace: true });
+    } else {
+      toast.success(`Welcome back, ${displayUsername}!`);
+      navigate("/robots", { replace: true });
     }
   };
 
@@ -304,12 +283,9 @@ export default function Login() {
     setShowPassword((prevState) => !prevState);
   };
 
-  // زر لتعبئة بيانات تجريبية (للتجربة فقط)
-  const fillDemoCredentials = () => {
-    setUsername("demo_user");
-    setPassword("demo123");
-    setRememberMe(true);
-    toast.info("Demo credentials filled. Click Sign In to login.");
+  const findUsernameInSavedList = (usernameToFind) => {
+    if (!usernameToFind) return null;
+    return savedUsernames.find(u => u.toLowerCase() === usernameToFind.toLowerCase());
   };
 
   if (isLoading) {
@@ -379,7 +355,7 @@ export default function Login() {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Type your username"
+                    placeholder="Enter username (case insensitive)"
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);
@@ -396,13 +372,6 @@ export default function Login() {
                     className="pl-9 pr-8 bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-main-color focus:border-main-color rounded-xl"
                     autoComplete="off"
                   />
-                  {/* {savedUsernames.length > 0 && (
-                    <ChevronDown
-                      className="absolute right-3 top-3 text-gray-400 cursor-pointer"
-                      size={16}
-                      onClick={() => setShowSuggestions(!showSuggestions)}
-                    />
-                  )} */}
                 </div>
                 
                 {/* Suggestions Dropdown */}
@@ -467,7 +436,7 @@ export default function Login() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder="type your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

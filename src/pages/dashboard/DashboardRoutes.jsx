@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "./DashboardLayout";
 import HomeDashboard from "./HomeDashboard";
 import ProjectDetails from "./ProjectDetails";
-import imgRobot from "../../assets/Robot1.jpeg";
+import imgRobot from "../../assets/Robot1.jpg";
 import RobotDetails from "./RobotDetails";
 import ProjectForm from "./ProjectForm";
 import AllUsersDashboard from "./AllUsersDashboard";

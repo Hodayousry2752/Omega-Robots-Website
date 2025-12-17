@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { getData } from "../../services/getServices";
-import imgRobot from "../../assets/Robot1.jpeg";
+import imgRobot from "../../assets/Robot1.jpg";
 
 export default function UserDetails() {
   const { id } = useParams();

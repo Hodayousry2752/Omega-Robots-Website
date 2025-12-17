@@ -2,7 +2,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, RefreshCcw, ArrowLeft } from "lucide-react";
+import { RotateCcw, RefreshCcw, ArrowLeft, Lock, Unlock, Eye, EyeOff } from "lucide-react";
 import { getData } from "@/services/getServices";
 import { toast } from "sonner";
 import axios from "axios";
@@ -11,7 +11,10 @@ import UserNotificationsTab from "@/components/robots/UserNotificationsTab";
 import UserLogsTab from "@/components/robots/UserLogsTab";
 import { useMqtt } from "@/context/MqttContext";
 import ScheduleDisplay from "@/components/robots/ScheduleDisplay";
-  const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL;
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/AuthContext";
+
+const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL;
 
 const getRobotImageSrc = (image) => {
   if (!image || image === "" || image === "Array" || image === "null") return "/default-robot.jpg";
@@ -86,10 +89,32 @@ const loadTimerEndTime = (robotId) => {
   }
 };
 
+const loadRobotLockState = (robotId) => {
+  try {
+    const storageKey = `robot_${robotId}_main_locked`;
+    const stored = localStorage.getItem(storageKey);
+    return stored ? JSON.parse(stored) : { locked: true, unlockedAt: null };
+  } catch (error) {
+    console.error("Error loading robot lock state:", error);
+    return { locked: true, unlockedAt: null };
+  }
+};
+
+const saveRobotLockState = (robotId, state) => {
+  try {
+    const storageKey = `robot_${robotId}_main_locked`;
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  } catch (error) {
+    console.error("Error saving robot lock state:", error);
+  }
+};
+
 export default function RobotDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { userName } = useAuth();
+  
   const [robot, setRobot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [buttonColors, setButtonColors] = useState({});
@@ -98,6 +123,15 @@ export default function RobotDetails() {
   const [isResetting, setIsResetting] = useState(false);
   const [buttonsWithColors, setButtonsWithColors] = useState([]);
   const [scheduleData, setScheduleData] = useState(null);
+  
+  const [robotSectionLocked, setRobotSectionLocked] = useState(true);
+  const [robotPasswordInput, setRobotPasswordInput] = useState("");
+  const [robotPasswordLoading, setRobotPasswordLoading] = useState(false);
+  const [userRobotPassword, setUserRobotPassword] = useState(null);
+  const [passwordError, setPasswordError] = useState(false);
+  const [userPasswordLoading, setUserPasswordLoading] = useState(true);
+  
+  const [showPassword, setShowPassword] = useState(false);
   
   const [displayTime, setDisplayTime] = useState("24:00:00");
   const timerRef = useRef(null);
@@ -132,6 +166,65 @@ export default function RobotDetails() {
     if (!isControlsTab(activeTrolleyTab)) return "trolley";
     return null;
   };
+
+  const fetchUserRobotPassword = useCallback(async () => {
+    if (!userName) {
+      console.log("❌ No userName available, skipping robot password fetch");
+      return;
+    }
+    
+    try {
+      setUserPasswordLoading(true);
+      console.log("🔐 Fetching robot password for user:", userName);
+      
+      const users = await getData(`${BASE_URL}/users.php`);
+      console.log("📋 All users:", users);
+      
+      const currentUser = users.find(user => 
+        user.Username && user.Username.trim().toLowerCase() === userName.trim().toLowerCase()
+      );
+      
+      console.log("👤 Current user found:", currentUser);
+      
+      if (currentUser) {
+        const password = currentUser.mainrobot_password;
+        setUserRobotPassword(password);
+        console.log("✅ Robot password loaded for user:", userName, password ? `Has password: ${password}` : "No password");
+        
+        if (!password || password.trim() === "") {
+          console.log("🔓 Auto-unlocking robot section (no password required)");
+          setRobotSectionLocked(false);
+          saveRobotLockState(id, { locked: false, unlockedAt: Date.now() });
+        }
+      } else {
+        console.warn("❌ Current user not found in users list");
+        console.log("Available usernames:", users.map(u => u.Username));
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch user robot password:", error);
+    } finally {
+      setUserPasswordLoading(false);
+    }
+  }, [userName, BASE_URL, id]);
+
+  useEffect(() => {
+    const lockState = loadRobotLockState(id);
+    console.log("🔒 Loaded lock state for robot:", id, lockState);
+    
+    if (lockState.locked === false && lockState.unlockedAt) {
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      const timeSinceUnlock = Date.now() - lockState.unlockedAt;
+      
+      if (timeSinceUnlock < twentyFourHours) {
+        setRobotSectionLocked(false);
+        console.log("🔓 Robot section already unlocked (within 24h)");
+      } else {
+        console.log("⏰ Lock expired, re-locking robot section");
+        setRobotSectionLocked(true);
+        saveRobotLockState(id, { locked: true, unlockedAt: null });
+      }
+    }
+  }, [id]);
 
   const publishStatusMessages = useCallback(() => {
     console.log("🔄 Publishing status messages via MQTT Context");
@@ -298,11 +391,14 @@ export default function RobotDetails() {
       try {
         setLoading(true);
         
+        await fetchUserRobotPassword();
+        
         await fetchRobotData();
         await fetchButtonColors();
         await fetchScheduleData();
         
       } catch (error) {
+        console.error("❌ Error loading initial data:", error);
         toast.error("Failed to load robot details");
       } finally {
         setLoading(false);
@@ -389,6 +485,35 @@ export default function RobotDetails() {
     setTimeout(() => {
       setIsResetting(false);
     }, 600);
+  };
+
+  const handleRobotPasswordSubmit = () => {
+    setRobotPasswordLoading(true);
+    setPasswordError(false);
+    
+    setTimeout(() => {
+      if (robotPasswordInput === userRobotPassword) {
+        setRobotSectionLocked(false);
+        saveRobotLockState(id, { locked: false, unlockedAt: Date.now() });
+        toast.success("Robot section unlocked successfully!");
+        setRobotPasswordInput("");
+        setShowPassword(false); 
+      } else {
+        setPasswordError(true);
+        toast.error("Incorrect password. Please try again.");
+      }
+      setRobotPasswordLoading(false);
+    }, 500);
+  };
+
+  const handleLockRobotSection = () => {
+    setRobotSectionLocked(true);
+    saveRobotLockState(id, { locked: true, unlockedAt: null });
+    toast.info("Robot section has been locked");
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   const startTimer = () => {
@@ -561,8 +686,133 @@ export default function RobotDetails() {
     });
   };
 
+  const renderRobotPasswordPrompt = () => {
+    if (userPasswordLoading) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-white rounded-3xl shadow-lg p-8 mb-8 border border-gray-100"
+        >
+          <div className="flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-main-color mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading robot password...</p>
+          </div>
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="bg-white rounded-3xl shadow-lg p-8 mb-8 border border-gray-100"
+      >
+        <div className="flex flex-col items-center justify-center">
+          <Lock className="w-16 h-16 text-main-color mb-4" />
+          <h3 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+            Robot Section Locked
+          </h3>
+          <p className="text-gray-600 text-center mb-6 max-w-md">
+            This robot section requires authentication. Please enter the robot password to access controls.
+          </p>
+          
+          {userRobotPassword === null || userRobotPassword === "" ? (
+            <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200 mb-6 w-full max-w-md">
+              <p className="text-yellow-800 font-medium">
+                Your account doesn't have a robot password configured.
+              </p>
+              <p className="text-yellow-600 text-sm mt-1">
+                Please contact your administrator to set a robot password for your account.
+              </p>
+            </div>
+          ) : (
+            <div className="w-full max-w-md space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="robotPassword" className="text-gray-700 font-medium block">
+                  Robot Password
+                </label>
+                <div className="relative">
+                  <Input
+                    id="robotPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={robotPasswordInput}
+                    onChange={(e) => {
+                      setRobotPasswordInput(e.target.value);
+                      setPasswordError(false);
+                    }}
+                    placeholder="Enter robot password"
+                    className={`w-full h-12 border ${passwordError ? 'border-red-500' : 'border-gray-300'} focus:border-main-color focus:ring-main-color rounded-xl pr-10`}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRobotPasswordSubmit();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                {passwordError && (
+                  <p className="text-red-500 text-sm mt-1">
+                    Incorrect password. Please try again.
+                  </p>
+                )}
+              </div>
+              
+              <Button
+                onClick={handleRobotPasswordSubmit}
+                disabled={robotPasswordLoading || !robotPasswordInput.trim()}
+                className="w-full h-12 bg-main-color text-white hover:bg-main-color/90 rounded-xl text-lg font-medium"
+              >
+                {robotPasswordLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Verifying...
+                  </span>
+                ) : (
+                  <>
+                    <Unlock className="w-5 h-5 mr-2" />
+                    Unlock Robot Section
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+          
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <p className="text-gray-500 text-sm">
+              User: <span className="font-medium text-gray-700">{userName}</span>
+            </p>
+            <p className="text-gray-500 text-sm mt-1">
+              This password is configured in your user profile as "Main Robot Password".
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   const renderRobotControls = () => {
     if (!robot) return null;
+    
+    if (robotSectionLocked) {
+      return renderRobotPasswordPrompt();
+    }
     
     const { Sections = {} } = robot;
     const mainSection = Sections?.main || {};
@@ -575,6 +825,19 @@ export default function RobotDetails() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
+        {/* {!robotSectionLocked && userRobotPassword && userRobotPassword.trim() !== "" && (
+          <div className="flex justify-end mb-4">
+            <Button
+              onClick={handleLockRobotSection}
+              variant="outline"
+              className="flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-full"
+            >
+              <Lock className="w-4 h-4" />
+              Lock Robot Section
+            </Button>
+          </div>
+        )} */}
+        
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 sm:gap-0">
           <div className="flex flex-col text-left text-base sm:text-lg font-medium text-gray-800 gap-2">
             {valueVisibility["voltage"] !== false && (
