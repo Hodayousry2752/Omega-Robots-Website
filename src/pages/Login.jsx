@@ -204,12 +204,35 @@ export default function Login() {
     const originalUsername = username.trim();
 
     try {
+      // First, check if we have this username (case-insensitive) in saved usernames
+      const savedMatch = savedUsernames.find(
+        saved => saved.toLowerCase() === originalUsername.toLowerCase()
+      );
+
+      // If found in saved usernames, use the saved version (with correct casing)
+      let usernameToTry = savedMatch || originalUsername;
+
+      // Also try the normalized version if different from saved
       const loginAttempts = [
-        { username: username, description: "as entered" },
-        { username: username.toLowerCase(), description: "lowercase" },
-        { username: username.toUpperCase(), description: "uppercase" },
-        { username: username.charAt(0).toUpperCase() + username.slice(1).toLowerCase(), description: "title case" }
+        { username: usernameToTry, description: "primary attempt" },
       ];
+
+      // Only add additional attempts if the username wasn't found in saved list
+      if (!savedMatch) {
+        // Add common variations
+        loginAttempts.push(
+          { username: originalUsername.toLowerCase(), description: "lowercase" },
+          { username: originalUsername.toUpperCase(), description: "uppercase" },
+          { 
+            username: originalUsername
+              .toLowerCase()
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' '), 
+            description: "proper case" 
+          }
+        );
+      }
 
       let loginSuccessful = false;
       let userData = null;
@@ -242,6 +265,38 @@ export default function Login() {
           password
         );
       } else {
+        // If all attempts fail, try one more thing: check if there's a username
+        // in the database that matches case-insensitively
+        try {
+          const allUsersResponse = await postData(`${BASE_URL}/get-users`, {});
+          if (allUsersResponse && Array.isArray(allUsersResponse)) {
+            const matchingUser = allUsersResponse.find(
+              user => (user.Username || user.username).toLowerCase() === originalUsername.toLowerCase()
+            );
+            
+            if (matchingUser) {
+              // Try with the exact username from database
+              const finalAttempt = await postData(`${BASE_URL}/login`, {
+                username: matchingUser.Username || matchingUser.username,
+                password,
+              });
+              
+              if (finalAttempt?.message === "Login successful" && finalAttempt?.user) {
+                console.log(`✅ Login successful with database case: ${matchingUser.Username || matchingUser.username}`);
+                await handleSuccessfulLogin(
+                  finalAttempt.user,
+                  originalUsername,
+                  matchingUser.Username || matchingUser.username,
+                  password
+                );
+                return;
+              }
+            }
+          }
+        } catch (fetchError) {
+          console.log("Could not fetch users list:", fetchError);
+        }
+        
         toast.error("Invalid username or password");
       }
     } catch (error) {
@@ -261,10 +316,10 @@ export default function Login() {
     
     login(userRole, userProjectName, displayUsername);
 
-    saveUsernameToList(displayUsername);
+    saveUsernameToList(actualUsername);
 
     if (rememberMe) {
-      saveCredentials(displayUsername, actualPassword);
+      saveCredentials(actualUsername, actualPassword);
       toast.info("Your credentials have been saved for future logins");
     } else {
       clearSavedCredentials();

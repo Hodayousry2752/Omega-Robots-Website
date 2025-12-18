@@ -794,14 +794,11 @@ export default function RobotDetails() {
             </div>
           )}
           
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+          {/* <div className="mt-6 pt-6 border-t border-gray-200 text-center">
             <p className="text-gray-500 text-sm">
               User: <span className="font-medium text-gray-700">{userName}</span>
             </p>
-            <p className="text-gray-500 text-sm mt-1">
-              This password is configured in your user profile as "Main Robot Password".
-            </p>
-          </div>
+          </div> */}
         </div>
       </motion.div>
     );

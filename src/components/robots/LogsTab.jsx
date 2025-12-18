@@ -10,6 +10,7 @@ export default function UserLogsTab({ sectionName }) {
   const [error, setError] = useState(null);
   const [deviceData, setDeviceData] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "" });
+  const [sectionCycles, setSectionCycles] = useState(null); // 🔥 NEW: Store cycles value
 
   const params = useParams();
   const location = useLocation();
@@ -39,6 +40,14 @@ export default function UserLogsTab({ sectionName }) {
     }
     fetchLogsAndDevice();
   }, [deviceId, deviceType, sectionName]);
+
+  // 🔥 NEW: Extract cycles from device data
+  useEffect(() => {
+    if (deviceData && deviceData.Sections && deviceData.Sections[sectionName]) {
+      const cycles = deviceData.Sections[sectionName].Cycles;
+      setSectionCycles(cycles);
+    }
+  }, [deviceData, sectionName]);
 
   // 🔥 NEW: Auto-refresh every 5 seconds
   useEffect(() => {
@@ -93,6 +102,11 @@ export default function UserLogsTab({ sectionName }) {
       const device = deviceRes.data;
       setDeviceData(device);
 
+      // 🔥 NEW: Set cycles when device data is fetched
+      if (device.Sections && device.Sections[sectionName]) {
+        setSectionCycles(device.Sections[sectionName].Cycles);
+      }
+
       const filtered = filterLogsBySection(allLogs, device, sectionName);
       setFilteredLogs(filtered);
     } catch (err) {
@@ -109,8 +123,12 @@ export default function UserLogsTab({ sectionName }) {
     }
 
     const headers = ["Date", "Time", "Message", "Topic"];
-
+    
+    // 🔥 NEW: Create CSV content with cycles row first
+    const cyclesRow = ["Total_Cycles", sectionCycles || "N/A", "", ""];
+    
     const csvContent = [
+      cyclesRow.join(","),
       headers.join(","),
       ...filteredLogs.map((log) =>
         [
@@ -170,7 +188,7 @@ export default function UserLogsTab({ sectionName }) {
             {deviceType === "robot" ? "Robot" : "Trolley"} Logs - {sectionName}
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Activity logs and system events
+            Activity logs and system events • Cycles: {sectionCycles !== null ? sectionCycles : "Loading..."}
           </p>
         </div>
         
@@ -199,7 +217,8 @@ export default function UserLogsTab({ sectionName }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-blue-700 font-medium">
-              Total Logs: <span className="font-bold">{filteredLogs.length}</span>
+              Total Logs: <span className="font-bold">{filteredLogs.length}</span> • 
+              Section Cycles: <span className="font-bold">{sectionCycles !== null ? sectionCycles : "N/A"}</span>
             </p>
             <p className="text-xs text-blue-600 mt-1">
               Showing last 10 logs only • Read-only access • Auto-refresh every 5 seconds
@@ -250,7 +269,7 @@ export default function UserLogsTab({ sectionName }) {
         <div className="mt-6 p-3 bg-gray-50 rounded-lg">
           <div className="flex justify-between items-center text-sm text-gray-600">
             <span>
-              Displaying {logs.length} logs
+              Displaying {logs.length} logs • Section Cycles: {sectionCycles !== null ? sectionCycles : "N/A"}
             </span>
             <span className="text-xs bg-main-color text-white px-2 py-1 rounded">
               Read Only
