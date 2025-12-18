@@ -387,7 +387,7 @@ export default function ScheduleDisplay({
       {schedule.days.includes("Nun") && (
         <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
           <div className="text-sm text-red-700">
-            <strong>⚠️ "Nun" Mode Active:</strong> Schedule will be sent with all zeros
+            <strong>⚠️ "Nun" Mode Active:</strong> This action will delete the current schedule
           </div>
         </div>
       )}

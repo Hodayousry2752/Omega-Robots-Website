@@ -24,8 +24,11 @@ export function MqttProvider({ children }) {
   const clientsRef = useRef({});
   
   const processingMessagesRef = useRef(new Map());
-  const processedMessagesRef = useRef(new Map());
+  const messageHistoryRef = useRef(new Map());
+  const lastProcessedMessageRef = useRef(null);
+  const dangerMessagesSet = useRef(new Set());
   const toastHistoryRef = useRef(new Map());
+  const savingToDatabaseRef = useRef(new Map());
 
   const userRoleRef = useRef(userRole);
   const projectNameCookieRef = useRef(projectNameFromCookie);
@@ -33,6 +36,7 @@ export function MqttProvider({ children }) {
   useEffect(() => {
     userRoleRef.current = userRole;
     projectNameCookieRef.current = projectNameFromCookie;
+    console.log("🔄 Updated user info in MqttContext:", { userRole, projectNameFromCookie });
   }, [userRole, projectNameFromCookie]);
 
   const fetchInitialData = useCallback(async () => {
@@ -127,35 +131,75 @@ export function MqttProvider({ children }) {
     return hasAlert && !hasInfo;
   };
 
-  const createMessageId = (topic, message) => {
-    const normalizedMessage = message.trim().toLowerCase();
-    return `${topic}:${btoa(normalizedMessage)}`;
+  const createMessageKey = (topic, message, robotId, sectionName) => {
+    const messageHash = btoa(unescape(encodeURIComponent(`${topic}:${message}`)));
+    return `${robotId}:${sectionName}:${messageHash}`;
   };
 
-  const isMessageProcessing = (messageId) => {
-    return processingMessagesRef.current.has(messageId);
+  const isMessageDuplicate = (topic, message, robotId, sectionName) => {
+    const key = createMessageKey(topic, message, robotId, sectionName);
+    const now = Date.now();
+    
+    if (messageHistoryRef.current.has(key)) {
+      const lastProcessed = messageHistoryRef.current.get(key);
+      if (now - lastProcessed < 3000) {
+        return true;
+      }
+    }
+    
+    return false;
   };
 
-  const startMessageProcessing = (messageId) => {
-    processingMessagesRef.current.set(messageId, Date.now());
-  };
-
-  const endMessageProcessing = (messageId) => {
-    processingMessagesRef.current.delete(messageId);
+  const markMessageAsProcessed = (topic, message, robotId, sectionName) => {
+    const key = createMessageKey(topic, message, robotId, sectionName);
+    messageHistoryRef.current.set(key, Date.now());
+    
     setTimeout(() => {
-      processedMessagesRef.current.delete(messageId);
-    }, 30000); // تنظيف بعد 30 ثانية
+      messageHistoryRef.current.delete(key);
+    }, 10000);
   };
 
-  const isToastDuplicate = (messageId) => {
-    return toastHistoryRef.current.has(messageId);
-  };
-
-  const markToastAsShown = (messageId) => {
-    toastHistoryRef.current.set(messageId, Date.now());
+  const isDangerMessageDuplicate = (message, robotId, sectionName, voltage = null) => {
+    const dangerKey = voltage 
+      ? `danger-${robotId}-${sectionName}-${voltage}`
+      : `danger-${robotId}-${sectionName}-${message}`;
+    
+    if (dangerMessagesSet.current.has(dangerKey)) {
+      return true;
+    }
+    
+    dangerMessagesSet.current.add(dangerKey);
     setTimeout(() => {
-      toastHistoryRef.current.delete(messageId);
+      dangerMessagesSet.current.delete(dangerKey);
+    }, 30000);
+    
+    return false;
+  };
+
+  const isToastDuplicate = (message) => {
+    const messageKey = btoa(unescape(encodeURIComponent(message)));
+    return toastHistoryRef.current.has(messageKey);
+  };
+
+  const markToastAsShown = (message) => {
+    const messageKey = btoa(unescape(encodeURIComponent(message)));
+    toastHistoryRef.current.set(messageKey, Date.now());
+    
+    setTimeout(() => {
+      toastHistoryRef.current.delete(messageKey);
     }, 5000);
+  };
+
+  const isSavingToDatabase = (messageKey) => {
+    return savingToDatabaseRef.current.has(messageKey);
+  };
+
+  const markAsSavingToDatabase = (messageKey) => {
+    savingToDatabaseRef.current.set(messageKey, Date.now());
+  };
+
+  const markAsSavedToDatabase = (messageKey) => {
+    savingToDatabaseRef.current.delete(messageKey);
   };
 
   const findTopicMain = useCallback((topic_sub) => {
@@ -198,17 +242,32 @@ export function MqttProvider({ children }) {
       const currentUserRole = userRoleRef.current;
       const currentProjectName = projectNameCookieRef.current;
       
+      console.log("🔍 CHECKING USER PROJECT FILTER:", {
+        userRole: currentUserRole,
+        projectNameFromCookie: currentProjectName,
+        robotProjectId: robotSectionInfo?.robot?.projectId
+      });
+
       if (currentUserRole !== 'user') {
+        console.log("👨‍💼 Admin/Dashboard user - showing all messages");
         return true;
       }
 
       if (!robotSectionInfo || !robotSectionInfo.robot) {
+        console.log("❌ No robot info - cannot filter");
         return false;
       }
 
       const robotProjectId = robotSectionInfo.robot.projectId;
-      
-      if (!robotProjectId || !currentProjectName) {
+      console.log("🤖 Robot's projectId from database:", robotProjectId);
+
+      if (!robotProjectId) {
+        console.log("❌ Robot has no projectId assigned");
+        return false;
+      }
+
+      if (!currentProjectName) {
+        console.log("❌ No project name in cookies");
         return false;
       }
 
@@ -222,11 +281,17 @@ export function MqttProvider({ children }) {
         });
 
         if (!userProject) {
+          console.log("❌ No matching project found for cookie name:", currentProjectName);
           return false;
         }
 
         const userProjectId = userProject.id || userProject.projectId;
-        return String(robotProjectId) === String(userProjectId);
+        console.log("✅ Found user's project ID:", userProjectId);
+        
+        const shouldShow = String(robotProjectId) === String(userProjectId);
+        console.log(`🔁 Project comparison: ${robotProjectId} === ${userProjectId} => ${shouldShow}`);
+        
+        return shouldShow;
         
       } catch (error) {
         console.error("❌ Error fetching projects for comparison:", error);
@@ -238,130 +303,24 @@ export function MqttProvider({ children }) {
     }
   }, [API_BASE]);
 
-  const sendAlertEmail = useCallback(async (robotSectionInfo, alertMessage, robotName = null, isVoltageAlert = false) => {
-    try {
-      if (!robotSectionInfo || !robotSectionInfo.robot) {
-        return;
-      }
-
-      const projectId = robotSectionInfo.robot.projectId;
-      
-      const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
-      if (!project) {
-        return;
-      }
-      
-      const projectName = project.ProjectName || project.projectName;
-      const projectUsers = usersDataRef.current.filter(user => {
-        const userProjectName = user.ProjectName || user.projectName;
-        return userProjectName && userProjectName.trim() === projectName.trim();
-      });
-      
-      if (projectUsers.length === 0) {
-        return;
-      }
-      
-      // Prepare email message based on alert type
-      let emailMessage = alertMessage;
-      if (robotName && !isVoltageAlert) {
-        // Regular alert format: "Danger Alert: Robot "Robot Name" + message"
-        emailMessage = `Danger Alert: Robot "${robotName}" ${alertMessage}`;
-      }
-      
-      // Send email to each user
-      for (const user of projectUsers) {
-        if (user.Email || user.email) {
-          const userEmail = user.Email || user.email;
-          try {
-            await axios.post(`${API_BASE}/sendEmail.php`, {
-              email: userEmail,
-              message: emailMessage,
-              subject: `Alert: ${robotName || 'Robot'} Notification`
-            });
-          } catch (emailError) {
-            console.error(`❌ Failed to send alert email to ${userEmail}:`, emailError);
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error("❌ Error in sendAlertEmail:", error);
-    }
-  }, [API_BASE]);
-
-  const saveMessageToDatabase = async (finalMessageObj, robotSectionInfo) => {
-    try {
-      // Save notification ONLY ONCE
-      const notificationResponse = await axios.post(`${API_BASE}/notifications.php`, finalMessageObj);
-      console.log("✅ Notification saved to database:", finalMessageObj.message);
-
-      // Save log ONLY ONCE
-      try {
-        await axios.post(`${API_BASE}/logs.php`, finalMessageObj);
-        console.log("✅ Log saved to database");
-      } catch (logError) {
-        console.warn("Could not save to logs:", logError.message);
-      }
-
-      const newNotification = {
-        ...finalMessageObj,
-        notificationId: notificationResponse.data.notificationId || 
-                       notificationResponse.data.id || 
-                       `mqtt-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        timestamp: new Date().getTime(),
-        isAlert: isAlertMessage(finalMessageObj.message) || finalMessageObj.type.toLowerCase() === 'alert' || finalMessageObj.type.toLowerCase() === 'error' || finalMessageObj.type.toLowerCase() === 'warning',
-        isMqtt: true,
-        source: 'mqtt',
-        displayMessage: `${finalMessageObj.robotName || 'Unknown Robot'} (${finalMessageObj.sectionName || 'Unknown Section'}): ${finalMessageObj.message}`
-      };
-
-      setNotifications(prev => {
-        const isDuplicate = prev.some(notif => 
-          notif.topic_main === newNotification.topic_main && 
-          notif.message === newNotification.message && 
-          notif.date === newNotification.date && 
-          notif.time === newNotification.time
-        );
-        
-        if (isDuplicate) {
-          return prev;
-        }
-        
-        const updated = [newNotification, ...prev];
-        return updated.slice(0, 1000);
-      });
-
-      // Send email for alert messages
-      const isVoltageAlert = finalMessageObj.message.includes('voltage is critically low');
-      if (newNotification.isAlert) {
-        await sendAlertEmail(robotSectionInfo, finalMessageObj.message, finalMessageObj.robotName, isVoltageAlert);
-      }
-
-      return newNotification;
-    } catch (error) {
-      console.error("❌ Failed to save message to database:", error);
-      throw error;
-    }
-  };
-
   const processAndSaveMessage = useCallback(async (topic, messageString, robotId, sectionName, isFromButton = false, buttonName = null, robotSectionInfo = null, robotName = null, messageType = "info") => {
-    const messageId = createMessageId(topic, messageString);
-    
-    // Check if message is already being processed or was recently processed
-    if (isMessageProcessing(messageId)) {
-      console.log("⏭️ Message is already being processed:", messageId);
-      return null;
-    }
-    
-    if (processedMessagesRef.current.has(messageId)) {
-      console.log("⏭️ Message was already processed recently:", messageId);
-      return null;
-    }
-    
     try {
-      // Start processing this message
-      startMessageProcessing(messageId);
+      const messageKey = createMessageKey(topic, messageString, robotId, sectionName);
       
+      if (isMessageDuplicate(topic, messageString, robotId, sectionName)) {
+        console.log("⏭️ Skipping duplicate message (already processed)");
+        return null;
+      }
+      
+      if (isSavingToDatabase(messageKey)) {
+        console.log("⏭️ Message is already being saved to database");
+        return null;
+      }
+      
+      markAsSavingToDatabase(messageKey);
+      markMessageAsProcessed(topic, messageString, robotId, sectionName);
+      
+      let finalMessageObj;
       const nowDate = new Date().toISOString().slice(0, 10);
       const nowTime = new Date().toISOString().slice(11, 19);
 
@@ -370,6 +329,15 @@ export function MqttProvider({ children }) {
       if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
         trimmed = trimmed.slice(1, -1);
       }
+
+      console.log("📨 PROCESSING MESSAGE (ONCE):", { 
+        topic, 
+        message: trimmed,
+        robotId,
+        sectionName,
+        robotName,
+        messageType
+      });
 
       if (!robotSectionInfo) {
         robotSectionInfo = findRobotAndSectionByTopic(topic);
@@ -382,10 +350,41 @@ export function MqttProvider({ children }) {
         topicMain = findTopicMain(topic);
       }
 
-      const finalMessageObj = {
+      console.log("🔍 Topic resolution:", {
+        inputTopic: topic,
+        topicMain: topicMain,
+        hasRobotInfo: !!robotSectionInfo,
+        robotName: robotSectionInfo?.robot?.RobotName
+      });
+
+      // Extract voltage from message if present
+      let extractedVoltage = null;
+      if (messageString.includes('voltage')) {
+        const voltagePatterns = [
+          /voltage:\s*(\d+)/i,
+          /voltage\s*=\s*(\d+)/i,
+          /"voltage":\s*(\d+)/i,
+          /volt.*?(\d+)/i
+        ];
+        
+        for (const pattern of voltagePatterns) {
+          const voltageMatch = messageString.match(pattern);
+          if (voltageMatch && voltageMatch[1]) {
+            extractedVoltage = parseInt(voltageMatch[1]);
+            break;
+          }
+        }
+      }
+
+      let finalType = messageType;
+      if (extractedVoltage !== null && extractedVoltage < 15) {
+        finalType = "alert";
+      }
+
+      finalMessageObj = {
         topic_main: topicMain, 
         message: trimmed,
-        type: messageType,
+        type: finalType,
         date: nowDate,
         time: nowTime,
         RobotId: robotId || (robotSectionInfo?.robot?.id),
@@ -393,46 +392,233 @@ export function MqttProvider({ children }) {
         sectionName: sectionName || robotSectionInfo?.sectionName
       };
 
-      console.log("💾 SAVING MESSAGE (ONCE):", finalMessageObj.message);
+      if (extractedVoltage !== null) {
+        finalMessageObj.voltage = extractedVoltage;
+      }
 
-      const notification = await saveMessageToDatabase(finalMessageObj, robotSectionInfo);
+      // Check if this is a low voltage alert
+      if (extractedVoltage !== null && extractedVoltage < 15) {
+        console.log(`🔴 LOW VOLTAGE DETECTED: ${extractedVoltage}V`);
+        
+        const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+        if (shouldShow) {
+          const toastMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
+          
+          if (!isToastDuplicate(toastMessage)) {
+            markToastAsShown(toastMessage);
+            toast.error(toastMessage, {
+              duration: 10000,
+            });
+          }
+        }
+        
+        // Send email alert for low voltage
+        if (robotSectionInfo && robotSectionInfo.robot) {
+          try {
+            const projectId = robotSectionInfo.robot.projectId;
+            const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
+            
+            if (project) {
+              const projectName = project.ProjectName || project.projectName;
+              const projectUsers = usersDataRef.current.filter(user => {
+                const userProjectName = user.ProjectName || user.projectName;
+                return userProjectName && userProjectName.trim() === projectName.trim();
+              });
+              
+              if (projectUsers.length > 0) {
+                const emailMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
+                
+                for (const user of projectUsers) {
+                  if (user.Email || user.email) {
+                    const userEmail = user.Email || user.email;
+                    try {
+                      await axios.post(`${API_BASE}/sendEmail.php`, {
+                        email: userEmail,
+                        message: emailMessage,
+                        subject: `Alert: Robot ${finalMessageObj.robotName} Low Voltage`
+                      });
+                    } catch (emailError) {
+                      console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (emailError) {
+            console.error("❌ Error sending low voltage email:", emailError);
+          }
+        }
+      }
       
-      // Mark as processed successfully
-      processedMessagesRef.current.set(messageId, Date.now());
+      // Check if this is a normal voltage update (15 or more)
+      if (extractedVoltage !== null && extractedVoltage >= 15) {
+        console.log(`🟢 NORMAL VOLTAGE UPDATE: ${extractedVoltage}V`);
+        
+        const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+        if (shouldShow) {
+          const toastMessage = `✅ Voltage updated for robot "${finalMessageObj.robotName}" to ${extractedVoltage}V`;
+          
+          if (!isToastDuplicate(toastMessage)) {
+            markToastAsShown(toastMessage);
+            toast.success(toastMessage, {
+              duration: 5000,
+            });
+          }
+        }
+      }
+
+      const isDangerMessage = finalMessageObj.message.includes('voltage is critically low') ||
+                             finalMessageObj.message.includes('Danger Alert') ||
+                             finalMessageObj.message.includes('⚠️ Danger');
       
-      return finalMessageObj;
+      if (isDangerMessage) {
+        const dangerDuplicate = isDangerMessageDuplicate(
+          finalMessageObj.message,
+          finalMessageObj.RobotId,
+          finalMessageObj.sectionName
+        );
+        
+        if (dangerDuplicate) {
+          console.log("⏭️ Skipping duplicate danger message");
+          markAsSavedToDatabase(messageKey);
+          return null;
+        }
+      }
+
+      const finalKey = `save-${finalMessageObj.RobotId}-${finalMessageObj.sectionName}-${finalMessageObj.topic_main}-${finalMessageObj.message}-${finalMessageObj.date}-${finalMessageObj.time}`;
+      if (messageHistoryRef.current.has(finalKey)) {
+        console.log("⏭️ Skipping duplicate message save (final check)");
+        markAsSavedToDatabase(messageKey);
+        return null;
+      }
+      
+      messageHistoryRef.current.set(finalKey, Date.now());
+
+      console.log("💾 SAVING MESSAGE (ONCE):", finalMessageObj);
+
+      try {
+        const notificationResponse = await axios.post(`${API_BASE}/notifications.php`, finalMessageObj);
+        console.log("✅ Notification saved to database with topic_main:", finalMessageObj.topic_main);
+
+        try {
+          await axios.post(`${API_BASE}/logs.php`, finalMessageObj);
+          console.log("✅ Log saved to database with topic_main:", finalMessageObj.topic_main);
+        } catch (logError) {
+          console.warn("Could not save to logs:", logError.message);
+        }
+
+        const newNotification = {
+          ...finalMessageObj,
+          notificationId: notificationResponse.data.notificationId || 
+                         notificationResponse.data.id || 
+                         `mqtt-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          timestamp: new Date().getTime(),
+          isAlert: isAlertMessage(finalMessageObj.message) || finalMessageObj.type === "alert",
+          isMqtt: true,
+          source: 'mqtt',
+          displayMessage: `${finalMessageObj.robotName || 'Unknown Robot'} (${finalMessageObj.sectionName || 'Unknown Section'}): ${finalMessageObj.message}`
+        };
+
+        setNotifications(prev => {
+          const isDuplicate = prev.some(notif => 
+            notif.RobotId === newNotification.RobotId &&
+            notif.sectionName === newNotification.sectionName &&
+            notif.topic_main === newNotification.topic_main && 
+            notif.message === newNotification.message && 
+            Math.abs(new Date(notif.date + 'T' + notif.time).getTime() - new Date(newNotification.date + 'T' + newNotification.time).getTime()) < 1000
+          );
+          
+          if (isDuplicate) {
+            console.log("⏭️ Skipping duplicate notification in state");
+            return prev;
+          }
+          
+          const updated = [newNotification, ...prev];
+          return updated.slice(0, 1000);
+        });
+
+        markAsSavedToDatabase(messageKey);
+        return finalMessageObj;
+      } catch (error) {
+        markAsSavedToDatabase(messageKey);
+        console.error("❌ Failed to save message to database:", error?.response?.data || error);
+        return null;
+      }
+
     } catch (err) {
+      markAsSavedToDatabase(createMessageKey(topic, messageString, robotId, sectionName));
       console.error("❌ Error in processAndSaveMessage:", err);
       return null;
-    } finally {
-      endMessageProcessing(messageId);
     }
-  }, [API_BASE, findTopicMain, findRobotAndSectionByTopic, sendAlertEmail]);
+  }, [API_BASE, findTopicMain, findRobotAndSectionByTopic, shouldShowMessageToUser]);
+
+  const sendEmailToProjectUsers = useCallback(async (projectId, robotName, voltage) => {
+    try {
+      const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
+      if (!project) {
+        console.log("❌ Project not found for email sending");
+        return;
+      }
+      
+      const projectName = project.ProjectName || project.projectName;
+      const projectUsers = usersDataRef.current.filter(user => {
+        const userProjectName = user.ProjectName || user.projectName;
+        return userProjectName && userProjectName.trim() === projectName.trim();
+      });
+      
+      if (projectUsers.length === 0) {
+        console.log("ℹ️ No users found for project:", projectName);
+        return;
+      }
+      
+      const emailMessage = `⚠️ Danger Alert: Robot "${robotName}" voltage is critically low (${voltage}V)!`;
+      
+      for (const user of projectUsers) {
+        if (user.Email || user.email) {
+          const userEmail = user.Email || user.email;
+          try {
+            await axios.post(`${API_BASE}/sendEmail.php`, {
+              email: userEmail,
+              message: emailMessage,
+              subject: `Alert: Robot ${robotName} Low Voltage`
+            });
+          } catch (emailError) {
+            console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error in sendEmailToProjectUsers:", error);
+    }
+  }, [API_BASE]);
 
   const sendLowVoltageAlert = useCallback(async (robotName, voltage, topic, robotSectionInfo) => {
     try {
-      const messageString = `⚠️ Danger: Robot "${robotName}" voltage is critically low (${voltage}V)!`;
-      const messageId = createMessageId(topic, messageString);
+      console.log(`🔴 LOW VOLTAGE ALERT: ${voltage}V in robot ${robotName}`);
       
-      if (isMessageProcessing(messageId) || processedMessagesRef.current.has(messageId)) {
+      const alertKey = `voltage-alert-${robotSectionInfo?.robot?.id}-${voltage}`;
+      if (dangerMessagesSet.current.has(alertKey)) {
         console.log("⏭️ Skipping duplicate voltage alert");
         return;
       }
       
       const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
-      
       if (shouldShow) {
-        if (!isToastDuplicate(messageId)) {
-          markToastAsShown(messageId);
-          toast.error(`⚠️ Danger Alert: Robot "${robotName}" voltage is critically low (${voltage}V)!`, {
+        const toastMessage = `⚠️ Danger Alert: Robot "${robotName}" voltage is critically low (${voltage}V)!`;
+        
+        if (!isToastDuplicate(toastMessage)) {
+          markToastAsShown(toastMessage);
+          toast.error(toastMessage, {
             duration: 10000,
           });
         }
       }
       
+      // Save alert to database
+      const alertMessage = `⚠️ Danger: Robot "${robotName}" voltage is critically low (${voltage}V)!`;
       const msgObj = await processAndSaveMessage(
         topic,
-        messageString,
+        alertMessage,
         robotSectionInfo?.robot?.id,
         robotSectionInfo?.sectionName,
         false,
@@ -442,27 +628,43 @@ export function MqttProvider({ children }) {
         "alert"
       );
       
-      if (msgObj) {
-        // Send email for low voltage alert
-        await sendAlertEmail(robotSectionInfo, messageString, robotName, true);
+      if (msgObj && !isDangerMessageDuplicate(alertMessage, robotSectionInfo?.robot?.id, robotSectionInfo?.sectionName, voltage)) {
+        console.log("✅ Low voltage alert saved to notifications and logs with topic_main:", msgObj.topic_main);
+        
+        dangerMessagesSet.current.add(alertKey);
+        setTimeout(() => {
+          dangerMessagesSet.current.delete(alertKey);
+        }, 30000);
+      } else {
+        console.log("⏭️ Skipping duplicate voltage alert (already processed)");
+      }
+      
+      // Send email only for low voltage
+      if (robotSectionInfo && robotSectionInfo.robot) {
+        const projectId = robotSectionInfo.robot.projectId;
+        await sendEmailToProjectUsers(projectId, robotName, voltage);
       }
       
     } catch (error) {
       console.error("❌ Failed to send low voltage alert:", error);
     }
-  }, [API_BASE, shouldShowMessageToUser, processAndSaveMessage, sendAlertEmail]);
+  }, [API_BASE, sendEmailToProjectUsers, shouldShowMessageToUser, processAndSaveMessage, isDangerMessageDuplicate]);
 
   const handleHalfCycleFinished = useCallback(async (robotId, sectionName, topic, connection, robotSectionInfo) => {
     try {
-      const messageString = `Half cycle finished`;
-      const messageId = createMessageId(topic, messageString);
+      const processingKey = `halfcycle-${robotId}-${sectionName}`;
       
-      if (isMessageProcessing(messageId) || processedMessagesRef.current.has(messageId)) {
-        console.log("⏭️ Skipping duplicate half-cycle");
+      if (processingMessagesRef.current.has(processingKey)) {
+        console.log("⏭️ Skipping duplicate half-cycle processing");
         return;
       }
       
-      startMessageProcessing(messageId);
+      processingMessagesRef.current.set(processingKey, true);
+      setTimeout(() => {
+        processingMessagesRef.current.delete(processingKey);
+      }, 5000);
+      
+      console.log(`🔄 HANDLING HALF CYCLE FINISHED for ${robotId}-${sectionName}`);
       
       let currentRobot;
       try {
@@ -474,12 +676,14 @@ export function MqttProvider({ children }) {
       }
       
       if (!currentRobot || !currentRobot.Sections || !currentRobot.Sections[sectionName]) {
-        endMessageProcessing(messageId);
+        console.error("❌ Robot or section not found");
         return;
       }
       
       const currentCycles = currentRobot.Sections[sectionName]?.Cycles || 0;
       const newCycles = parseFloat(currentCycles) + 0.5;
+      
+      console.log(`🔢 Increasing cycles: ${currentCycles} → ${newCycles}`);
       
       const updatedSections = {
         ...currentRobot.Sections,
@@ -495,9 +699,10 @@ export function MqttProvider({ children }) {
       };
       
       try {
-        await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
+        const response = await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
+        console.log("✅ HALF CYCLE UPDATE SUCCESS:", response.data);
         
-        const updatedRobot = updatePayload;
+        const updatedRobot = response.data;
         const index = robotsDataRef.current.findIndex(r => r.id === robotId);
         if (index !== -1) {
           robotsDataRef.current[index] = updatedRobot;
@@ -524,17 +729,18 @@ export function MqttProvider({ children }) {
             currentRobot.RobotName
           );
           
-          if (!isToastDuplicate(createMessageId(topic, msg))) {
-            markToastAsShown(createMessageId(topic, msg));
-            toast.success(`Half cycle finished for ${currentRobot.RobotName}. Cycles: ${newCycles}`);
+          const toastMessage = `Half cycle finished for ${currentRobot.RobotName}. Cycles: ${newCycles}`;
+          if (!isToastDuplicate(toastMessage)) {
+            markToastAsShown(toastMessage);
+            toast.success(toastMessage);
           }
+        } else {
+          console.log("⏭️ Skipping half-cycle toast (user not in same project)");
         }
         
       } catch (error) {
         console.error("❌ HALF CYCLE UPDATE FAILED:", error);
       }
-      
-      endMessageProcessing(messageId);
       
     } catch (error) {
       console.error("❌ Error in handleHalfCycleFinished:", error);
@@ -574,7 +780,7 @@ export function MqttProvider({ children }) {
   const extractAllDataFromMessage = useCallback((messageString) => {
     const statusData = {};
     
-    // First, try to parse as JSON
+    // First, try to parse as JSON for the new format
     try {
       const parsedMessage = JSON.parse(messageString);
       if (parsedMessage.type && parsedMessage.message) {
@@ -588,7 +794,6 @@ export function MqttProvider({ children }) {
       // Not valid JSON or not in expected format, continue with regular parsing
     }
     
-    // Extract voltage
     const voltagePatterns = [
       /voltage:\s*(\d+)/i,
       /voltage\s*=\s*(\d+)/i,
@@ -604,7 +809,6 @@ export function MqttProvider({ children }) {
       }
     }
     
-    // Extract mode
     const modePatterns = [
       /mode:\s*([a-zA-Z]+)/i,
       /mode\s*=\s*([a-zA-Z]+)/i,
@@ -620,7 +824,29 @@ export function MqttProvider({ children }) {
       }
     }
     
-    // Check for message_status pattern
+    const currentUserRole = userRoleRef.current;
+    if (currentUserRole === 'user' && messageString.includes('message_status:{cycles:')) {
+      console.log("⏭️ Skipping cycles message_status for user");
+      return null;
+    }
+    
+    if (currentUserRole !== 'user') {
+      const cyclesPatterns = [
+        /cycles:\s*(\d+)/i,
+        /cycles\s*=\s*(\d+)/i,
+        /"cycles":\s*(\d+)/i,
+        /cycle.*?(\d+)/i
+      ];
+      
+      for (const pattern of cyclesPatterns) {
+        const cyclesMatch = messageString.match(pattern);
+        if (cyclesMatch && cyclesMatch[1]) {
+          statusData.cycles = parseInt(cyclesMatch[1]);
+          break;
+        }
+      }
+    }
+    
     if (messageString.includes('message_status:')) {
       const statusMatch = messageString.match(/message_status:\s*\{([^}]+)\}/i);
       if (statusMatch && statusMatch[1]) {
@@ -635,6 +861,13 @@ export function MqttProvider({ children }) {
         
         if (modeMatch && modeMatch[1]) {
           statusData.mode = modeMatch[1];
+        }
+        
+        if (currentUserRole !== 'user') {
+          const cyclesMatch = statusContent.match(/cycles:\s*(\d+)/i);
+          if (cyclesMatch && cyclesMatch[1]) {
+            statusData.cycles = parseInt(cyclesMatch[1]);
+          }
         }
       }
     }
@@ -690,14 +923,6 @@ export function MqttProvider({ children }) {
   }, [API_BASE]);
 
   const updateRobotSectionData = useCallback(async (robotId, sectionName, updatedData, robotName, topic, robotSectionInfo) => {
-    const updateId = `update-${robotId}-${sectionName}-${Date.now()}`;
-    
-    if (processingMessagesRef.current.has(updateId)) {
-      return;
-    }
-    
-    processingMessagesRef.current.set(updateId, true);
-    
     try {
       const currentRobotResponse = await axios.get(`${API_BASE}/robots/${robotId}`);
       const currentRobot = currentRobotResponse.data;
@@ -716,41 +941,71 @@ export function MqttProvider({ children }) {
         Sections: updatedSections
       };
 
-      await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
+      const response = await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
       
+      if (updatedData.voltage !== undefined && updatedData.voltage >= 15) {
+        const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+        if (shouldShow) {
+          const toastMessage = `✅ Voltage updated for robot "${robotName}" to ${updatedData.voltage}V`;
+          if (!isToastDuplicate(toastMessage)) {
+            markToastAsShown(toastMessage);
+            toast.success(toastMessage, {
+              duration: 5000,
+            });
+          }
+        }
+      }
+      
+      if (updatedData.mode !== undefined) {
+        const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+        if (shouldShow) {
+          const toastMessage = `🔄 Status updated for robot "${robotName}" to ${updatedData.mode}`;
+          if (!isToastDuplicate(toastMessage)) {
+            markToastAsShown(toastMessage);
+            toast.info(toastMessage, {
+              duration: 5000,
+            });
+          }
+        }
+      }
+      
+      // For low voltage, trigger the alert system
       if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       
-      setTimeout(() => {
-        updateAllFieldsSeparately(robotId, sectionName, updatedData);
+      setTimeout(async () => {
+        await updateAllFieldsSeparately(robotId, sectionName, updatedData);
       }, 500);
       
+      return response.data;
     } catch (error) {
       await updateAllFieldsSeparately(robotId, sectionName, updatedData);
       
+      // For low voltage, trigger the alert system
       if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       
       throw error;
-    } finally {
-      setTimeout(() => {
-        processingMessagesRef.current.delete(updateId);
-      }, 3000);
     }
-  }, [API_BASE, updateAllFieldsSeparately, sendLowVoltageAlert]);
+  }, [API_BASE, updateAllFieldsSeparately, sendLowVoltageAlert, shouldShowMessageToUser]);
 
   const fetchAndConnectRobots = useCallback(async () => {
     if (isInitialized) return;
 
     try {
+      console.log("Fetching robots from API for MQTT connections...");
+      
       const robotsArray = await fetchInitialData();
       
       if (!robotsArray.length) {
+        console.log("No robots data available yet");
         setIsInitialized(true);
         return;
       }
+      
+      console.log(`Found ${robotsArray.length} robots from API`);
       
       let allConnections = [];
       const newClients = {};
@@ -760,7 +1015,10 @@ export function MqttProvider({ children }) {
         allConnections = [...allConnections, ...robotConnections];
       });
       
+      console.log(`Extracted ${allConnections.length} MQTT connections from robots`);
+      
       if (allConnections.length === 0) {
+        console.log("No MQTT connections found in robot data");
         setIsInitialized(true);
         return;
       }
@@ -768,6 +1026,8 @@ export function MqttProvider({ children }) {
       allConnections.forEach(connection => {
         try {
           const connectUrl = `wss://${connection.host}:${connection.port}/mqtt`;
+          
+          console.log(`Connecting to MQTT for ${connection.robotName} - ${connection.sectionName}...`);
           
           const client = mqtt.connect(connectUrl, {
             clientId: connection.clientId,
@@ -780,6 +1040,8 @@ export function MqttProvider({ children }) {
           });
 
           client.on("connect", () => {
+            console.log(`✅ MQTT Connected to: ${connection.robotName} - ${connection.sectionName}`);
+            
             setActiveConnections(prev => {
               const existing = prev.filter(conn => 
                 conn.robotId !== connection.robotId || conn.sectionName !== connection.sectionName
@@ -795,6 +1057,8 @@ export function MqttProvider({ children }) {
               client.subscribe(connection.topicSubscribe, (err) => {
                 if (err) {
                   console.error(`Subscribe error for ${connection.robotName}:`, err);
+                } else {
+                  console.log(`✅ Subscribed ONLY to Topic_subscribe: ${connection.topicSubscribe} for ${connection.robotName}`);
                 }
               });
             }
@@ -803,22 +1067,89 @@ export function MqttProvider({ children }) {
           client.on("message", async (topic, payload) => {
             try {
               const messageString = payload.toString();
-              const messageId = createMessageId(topic, messageString);
               
-              // Check if message is already being processed or was recently processed
-              if (isMessageProcessing(messageId) || processedMessagesRef.current.has(messageId)) {
+              if (isMessageDuplicate(topic, messageString, connection.robotId, connection.sectionName)) {
+                console.log("⏭️ Skipping duplicate message in MQTT handler");
                 return;
               }
               
+              console.log(`📩 MQTT Message from ${connection.robotName}:`, {
+                topic,
+                message: messageString,
+                robotId: connection.robotId,
+                robotName: connection.robotName,
+                sectionName: connection.sectionName
+              });
+              
               const messageLower = messageString.toLowerCase();
+              const messageExact = messageString.trim();
+              
               const isHalfCycle = messageLower.includes('half cycle finished') || 
-                                 messageString.trim() === "Half cycle finished" ||
+                                 messageExact === "Half cycle finished" ||
                                  messageLower.includes('half-cycle finished');
               
               const robotSectionInfo = findRobotAndSectionByTopic(topic);
               
-              // Handle half-cycle messages
+              // Handle JSON messages with type and message
+              try {
+                const parsedMessage = JSON.parse(messageString);
+                if (parsedMessage.type && parsedMessage.message) {
+                  console.log("📋 PROCESSING JSON MESSAGE WITH TYPE:", parsedMessage.type);
+                  
+                  const msgObj = await processAndSaveMessage(
+                    topic, 
+                    parsedMessage.message,
+                    connection.robotId, 
+                    connection.sectionName,
+                    false, 
+                    null,
+                    robotSectionInfo,
+                    connection.robotName,
+                    parsedMessage.type
+                  );
+                  
+                  if (msgObj) {
+                    console.log("✅ JSON message processed and saved:", msgObj);
+                    
+                    const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+                    
+                    if (shouldShow) {
+                      const robotDisplayName = msgObj.robotName || connection.robotName;
+                      const isAlertType = parsedMessage.type.toLowerCase() === 'alert' || 
+                                         parsedMessage.type.toLowerCase() === 'error' ||
+                                         parsedMessage.type.toLowerCase() === 'warning';
+                      
+                      if (isAlertType) {
+                        const toastMessage = `🚨 ${robotDisplayName}: ${parsedMessage.message}`;
+                        if (!isToastDuplicate(toastMessage)) {
+                          markToastAsShown(toastMessage);
+                          toast.error(`🚨 ${robotDisplayName}`, {
+                            description: parsedMessage.message.length > 100 ? 
+                              `${parsedMessage.message.substring(0, 100)}...` : parsedMessage.message,
+                            duration: 8000,
+                          });
+                        }
+                      } else {
+                        const toastMessage = `ℹ️ ${robotDisplayName} (${parsedMessage.type}): ${parsedMessage.message}`;
+                        if (!isToastDuplicate(toastMessage)) {
+                          markToastAsShown(toastMessage);
+                          toast.info(`ℹ️ ${robotDisplayName} (${parsedMessage.type})`, {
+                            description: parsedMessage.message.length > 80 ? 
+                              `${parsedMessage.message.substring(0, 80)}...` : parsedMessage.message,
+                            duration: 5000,
+                          });
+                        }
+                      }
+                    }
+                  }
+                  return;
+                }
+              } catch (error) {
+                // Not JSON, continue with normal processing
+              }
+              
               if (isHalfCycle) {
+                console.log(`🎯 HALF CYCLE FINISHED DETECTED for ${connection.robotName}`);
                 await handleHalfCycleFinished(
                   connection.robotId, 
                   connection.sectionName, 
@@ -829,61 +1160,14 @@ export function MqttProvider({ children }) {
                 return;
               }
               
-              // Try to extract message_status data
               const messageData = extractAllDataFromMessage(messageString);
               
-              // Handle JSON messages
-              if (messageData && messageData.isJsonMessage) {
-                const msgObj = await processAndSaveMessage(
-                  topic, 
-                  messageData.message,
-                  connection.robotId, 
-                  connection.sectionName,
-                  false, 
-                  null,
-                  robotSectionInfo,
-                  connection.robotName,
-                  messageData.type
-                );
-                
-                if (msgObj) {
-                  const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
-                  
-                  if (shouldShow) {
-                    const robotDisplayName = msgObj.robotName || connection.robotName;
-                    const isAlertType = messageData.type.toLowerCase() === 'alert' || 
-                                       messageData.type.toLowerCase() === 'error' ||
-                                       messageData.type.toLowerCase() === 'warning';
-                    
-                    if (isAlertType) {
-                      if (!isToastDuplicate(messageId)) {
-                        markToastAsShown(messageId);
-                        toast.error(`🚨 ${robotDisplayName}`, {
-                          description: messageData.message.length > 100 ? 
-                            `${messageData.message.substring(0, 100)}...` : messageData.message,
-                          duration: 8000,
-                        });
-                      }
-                    } else {
-                      if (!isToastDuplicate(messageId)) {
-                        markToastAsShown(messageId);
-                        toast.info(`ℹ️ ${robotDisplayName} (${messageData.type})`, {
-                          description: messageData.message.length > 80 ? 
-                            `${messageData.message.substring(0, 80)}...` : messageData.message,
-                          duration: 5000,
-                        });
-                      }
-                    }
-                  }
-                }
-                return;
-              }
-              
-              // Handle regular message_status data - NOT saved as notification
               if (messageData) {
+                console.log("🎯 PROCESSING MESSAGE_STATUS DATA:", messageData);
+                
                 try {
                   if (robotSectionInfo) {
-                    const { robot, sectionName } = robotSectionInfo;
+                    const { robot, sectionName, section } = robotSectionInfo;
                     
                     await updateRobotSectionData(
                       robot.id, 
@@ -893,14 +1177,18 @@ export function MqttProvider({ children }) {
                       topic, 
                       robotSectionInfo
                     );
+                    
+                  } else {
+                    console.log("❌ No matching robot found for topic:", topic);
                   }
                 } catch (error) {
                   console.error("❌ Error processing message update:", error);
                 }
-                return;
+                return; 
               }
               
-              // Handle all other normal messages
+              console.log("📝 PROCESSING NORMAL MESSAGE...");
+              
               const msgObj = await processAndSaveMessage(
                 topic, 
                 messageString, 
@@ -913,7 +1201,10 @@ export function MqttProvider({ children }) {
               );
               
               if (msgObj) {
+                console.log("✅ Message processed and saved (ONCE):", msgObj);
+                
                 const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+                
                 const isScheduleMessage = messageString.toLowerCase().includes('schedule');
                 
                 if (shouldShow && !(userRoleRef.current === 'user' && isScheduleMessage)) {
@@ -927,8 +1218,9 @@ export function MqttProvider({ children }) {
                       messageLower.includes('warning') ||
                       messageLower.includes('fail')) {
                     
-                    if (!isToastDuplicate(messageId)) {
-                      markToastAsShown(messageId);
+                    const toastMessage = `🚨 ${robotDisplayName}: ${msgObj.message}`;
+                    if (!isToastDuplicate(toastMessage)) {
+                      markToastAsShown(toastMessage);
                       toast.error(`🚨 ${robotDisplayName}`, {
                         description: msgObj.message.length > 100 ? 
                           `${msgObj.message.substring(0, 100)}...` : msgObj.message,
@@ -936,8 +1228,9 @@ export function MqttProvider({ children }) {
                       });
                     }
                   } else {
-                    if (!isToastDuplicate(messageId)) {
-                      markToastAsShown(messageId);
+                    const toastMessage = `ℹ️ ${robotDisplayName}: ${msgObj.message}`;
+                    if (!isToastDuplicate(toastMessage)) {
+                      markToastAsShown(toastMessage);
                       toast.info(`ℹ️ ${robotDisplayName}`, {
                         description: msgObj.message.length > 80 ? 
                           `${msgObj.message.substring(0, 80)}...` : msgObj.message,
@@ -945,6 +1238,8 @@ export function MqttProvider({ children }) {
                       });
                     }
                   }
+                } else {
+                  console.log("⏭️ Skipping toast (user not in same project or schedule message for user)");
                 }
               }
 
@@ -965,6 +1260,7 @@ export function MqttProvider({ children }) {
           });
 
           client.on("close", () => {
+            console.log(`🔌 MQTT Disconnected from ${connection.robotName} - ${connection.sectionName}`);
             setActiveConnections(prev => 
               prev.map(conn => 
                 (conn.robotId === connection.robotId && conn.sectionName === connection.sectionName)
@@ -975,6 +1271,7 @@ export function MqttProvider({ children }) {
           });
 
           client.on("offline", () => {
+            console.log(`📴 ${connection.robotName} - ${connection.sectionName} is offline`);
             setActiveConnections(prev => 
               prev.map(conn => 
                 (conn.robotId === connection.robotId && conn.sectionName === connection.sectionName)
@@ -1007,6 +1304,7 @@ export function MqttProvider({ children }) {
     const client = clientsRef.current[clientKey];
     
     if (client) {
+      console.log(`Reconnecting ${robotId}-${sectionName}...`);
       client.end();
       
       setTimeout(() => {
@@ -1016,6 +1314,7 @@ export function MqttProvider({ children }) {
   }, [fetchAndConnectRobots]);
 
   const reconnectAll = useCallback(() => {
+    console.log("Reconnecting all MQTT connections...");
     Object.values(clientsRef.current).forEach(client => {
       if (client && client.end) {
         client.end();
@@ -1043,6 +1342,8 @@ export function MqttProvider({ children }) {
     
     try {
       client.publish(topic, message);
+      console.log(`📤 Published to ${robotId}-${sectionName}: ${topic} -> ${message}`);
+      
       return true;
     } catch (error) {
       console.error(`Publish failed for ${robotId}-${sectionName}:`, error);
@@ -1052,8 +1353,12 @@ export function MqttProvider({ children }) {
 
   const publishButtonMessage = useCallback((robotId, sectionName, topic, buttonValue) => {
     try {
+      console.log("🔄 publishButtonMessage CALLED:", { robotId, sectionName, topic, buttonValue });
+      
       const actualButtonName = findActualButtonName(topic, buttonValue);
       const finalMessage = actualButtonName;
+      
+      console.log("📤 SENDING FINAL MESSAGE:", finalMessage);
       
       const published = publishMessage(robotId, sectionName, topic, finalMessage);
       
@@ -1061,9 +1366,13 @@ export function MqttProvider({ children }) {
       const currentUserRole = userRoleRef.current;
       
       if (published && currentUserRole === 'user' && isScheduleButton) {
-        toast.success(`Schedule command sent successfully to ${robotId}-${sectionName}`, {
-          duration: 3000,
-        });
+        const toastMessage = `Schedule command sent successfully to ${robotId}-${sectionName}`;
+        if (!isToastDuplicate(toastMessage)) {
+          markToastAsShown(toastMessage);
+          toast.success(toastMessage, {
+            duration: 3000,
+          });
+        }
       }
       
       if (published) {
@@ -1114,6 +1423,7 @@ export function MqttProvider({ children }) {
 
   useEffect(() => {
     return () => {
+      console.log("Cleaning up all MQTT connections...");
       Object.values(clientsRef.current).forEach(client => {
         if (client && client.end) {
           try {

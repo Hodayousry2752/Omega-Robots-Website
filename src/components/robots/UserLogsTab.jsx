@@ -97,9 +97,15 @@ export default function UserLogsTab({ sectionName }) {
       return;
     }
 
+    // Get cycles value from device data
+    const cycles = deviceData?.Sections?.[sectionName]?.Cycles || "N/A";
+    
+    // Create CSV content with cycles row first
+    const cyclesRow = ["Total_Cycles", cycles, "", ""];
     const headers = ["Date", "Time", "Message", "Topic"];
 
     const csvContent = [
+      cyclesRow.join(","),
       headers.join(","),
       ...filteredLogs.map((log) =>
         [

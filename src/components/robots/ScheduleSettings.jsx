@@ -352,9 +352,9 @@ export default function ScheduleSettings({
 
       {schedule.days.includes("Nun") && (
         <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
-          <div className="text-sm text-red-700 flex items-center">
-            <strong>⚠️ "Nun" Mode Active:</strong> 
-            <span className="ml-2">Schedule will be sent with all zeros (00:00, 0_0_0_0_0_0_0_0)</span>
+          <div className="text-sm text-red-700 flex-col justify-center">
+            <span className="ml-2"><strong>⚠️ "Nun" Mode Active:</strong> Schedule will be sent with all zeros (00:00, 0_0_0_0_0_0_0_0)</span>
+            <p className="pt-2">This action will delete the current schedule</p>
           </div>
         </div>
       )}
