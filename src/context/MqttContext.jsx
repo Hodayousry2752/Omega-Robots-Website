@@ -29,6 +29,7 @@ export function MqttProvider({ children }) {
   const dangerMessagesSet = useRef(new Set());
   const toastHistoryRef = useRef(new Map());
   const savingToDatabaseRef = useRef(new Map());
+  const lowVoltageEmailSentRef = useRef(new Set());
 
   const userRoleRef = useRef(userRole);
   const projectNameCookieRef = useRef(projectNameFromCookie);
@@ -303,6 +304,44 @@ export function MqttProvider({ children }) {
     }
   }, [API_BASE]);
 
+  const sendAlertEmailToProjectUsers = useCallback(async (projectId, robotName, alertMessage, subject) => {
+    try {
+      const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
+      if (!project) {
+        console.log("❌ Project not found for alert email sending");
+        return;
+      }
+      
+      const projectName = project.ProjectName || project.projectName;
+      const projectUsers = usersDataRef.current.filter(user => {
+        const userProjectName = user.ProjectName || user.projectName;
+        return userProjectName && userProjectName.trim() === projectName.trim();
+      });
+      
+      if (projectUsers.length === 0) {
+        console.log("ℹ️ No users found for project:", projectName);
+        return;
+      }
+      
+      for (const user of projectUsers) {
+        if (user.Email || user.email) {
+          const userEmail = user.Email || user.email;
+          try {
+            await axios.post(`${API_BASE}/sendEmail.php`, {
+              email: userEmail,
+              message: alertMessage,
+              subject: subject
+            });
+          } catch (emailError) {
+            console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error in sendAlertEmailToProjectUsers:", error);
+    }
+  }, [API_BASE]);
+
   const processAndSaveMessage = useCallback(async (topic, messageString, robotId, sectionName, isFromButton = false, buttonName = null, robotSectionInfo = null, robotName = null, messageType = "info") => {
     try {
       const messageKey = createMessageKey(topic, messageString, robotId, sectionName);
@@ -396,57 +435,64 @@ export function MqttProvider({ children }) {
         finalMessageObj.voltage = extractedVoltage;
       }
 
-      // Check if this is a low voltage alert
       if (extractedVoltage !== null && extractedVoltage < 15) {
         console.log(`🔴 LOW VOLTAGE DETECTED: ${extractedVoltage}V`);
         
-        const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
-        if (shouldShow) {
-          const toastMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
-          
-          if (!isToastDuplicate(toastMessage)) {
-            markToastAsShown(toastMessage);
-            toast.error(toastMessage, {
-              duration: 10000,
-            });
-          }
-        }
+        const lowVoltageKey = `low-${robotId}-${sectionName}-${extractedVoltage}`;
         
-        // Send email alert for low voltage
-        if (robotSectionInfo && robotSectionInfo.robot) {
-          try {
-            const projectId = robotSectionInfo.robot.projectId;
-            const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
+        if (!lowVoltageEmailSentRef.current.has(lowVoltageKey)) {
+          lowVoltageEmailSentRef.current.add(lowVoltageKey);
+          
+          setTimeout(() => {
+            lowVoltageEmailSentRef.current.delete(lowVoltageKey);
+          }, 300000);
+          
+          const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
+          if (shouldShow) {
+            const toastMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
             
-            if (project) {
-              const projectName = project.ProjectName || project.projectName;
-              const projectUsers = usersDataRef.current.filter(user => {
-                const userProjectName = user.ProjectName || user.projectName;
-                return userProjectName && userProjectName.trim() === projectName.trim();
+            if (!isToastDuplicate(toastMessage)) {
+              markToastAsShown(toastMessage);
+              toast.error(toastMessage, {
+                duration: 10000,
               });
+            }
+          }
+          
+          if (robotSectionInfo && robotSectionInfo.robot) {
+            try {
+              const projectId = robotSectionInfo.robot.projectId;
+              const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
               
-              if (projectUsers.length > 0) {
-                const emailMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
+              if (project) {
+                const projectName = project.ProjectName || project.projectName;
+                const projectUsers = usersDataRef.current.filter(user => {
+                  const userProjectName = user.ProjectName || user.projectName;
+                  return userProjectName && userProjectName.trim() === projectName.trim();
+                });
                 
-                for (const user of projectUsers) {
-                  if (user.Email || user.email) {
-                    const userEmail = user.Email || user.email;
-                    try {
-                      await axios.post(`${API_BASE}/sendEmail.php`, {
-                        email: userEmail,
-                        message: emailMessage,
-                        subject: `Alert: Robot ${finalMessageObj.robotName} Low Voltage`
-                      });
-                    } catch (emailError) {
-                      console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
+                if (projectUsers.length > 0) {
+                  const emailMessage = `⚠️ Danger Alert: Robot "${finalMessageObj.robotName}" voltage is critically low (${extractedVoltage}V)!`;
+                  
+                  for (const user of projectUsers) {
+                    if (user.Email || user.email) {
+                      const userEmail = user.Email || user.email;
+                      try {
+                        await axios.post(`${API_BASE}/sendEmail.php`, {
+                          email: userEmail,
+                          message: emailMessage,
+                          subject: `Alert: Robot ${finalMessageObj.robotName} Low Voltage`
+                        });
+                      } catch (emailError) {
+                      }
                     }
                   }
                 }
               }
+            } catch (emailError) {
             }
-          } catch (emailError) {
-            console.error("❌ Error sending low voltage email:", emailError);
           }
+        } else {
         }
       }
       
@@ -554,6 +600,12 @@ export function MqttProvider({ children }) {
 
   const sendEmailToProjectUsers = useCallback(async (projectId, robotName, voltage) => {
     try {
+      const emailKey = `email-${projectId}-${robotName}-${voltage}`;
+      
+      if (lowVoltageEmailSentRef.current.has(emailKey)) {
+        return;
+      }
+      
       const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
       if (!project) {
         console.log("❌ Project not found for email sending");
@@ -587,6 +639,13 @@ export function MqttProvider({ children }) {
           }
         }
       }
+      
+      lowVoltageEmailSentRef.current.add(emailKey);
+      
+      setTimeout(() => {
+        lowVoltageEmailSentRef.current.delete(emailKey);
+      }, 300000);
+      
     } catch (error) {
       console.error("❌ Error in sendEmailToProjectUsers:", error);
     }
@@ -639,16 +698,15 @@ export function MqttProvider({ children }) {
         console.log("⏭️ Skipping duplicate voltage alert (already processed)");
       }
       
-      // Send email only for low voltage
-      if (robotSectionInfo && robotSectionInfo.robot) {
-        const projectId = robotSectionInfo.robot.projectId;
-        await sendEmailToProjectUsers(projectId, robotName, voltage);
-      }
+      // if (robotSectionInfo && robotSectionInfo.robot) {
+      //   const projectId = robotSectionInfo.robot.projectId;
+      //   await sendEmailToProjectUsers(projectId, robotName, voltage);
+      // }
       
     } catch (error) {
       console.error("❌ Failed to send low voltage alert:", error);
     }
-  }, [API_BASE, sendEmailToProjectUsers, shouldShowMessageToUser, processAndSaveMessage, isDangerMessageDuplicate]);
+  }, [API_BASE, shouldShowMessageToUser, processAndSaveMessage, isDangerMessageDuplicate]);
 
   const handleHalfCycleFinished = useCallback(async (robotId, sectionName, topic, connection, robotSectionInfo) => {
     try {
@@ -1129,6 +1187,32 @@ export function MqttProvider({ children }) {
                             duration: 8000,
                           });
                         }
+                        
+                        if (robotSectionInfo && robotSectionInfo.robot) {
+                          const projectId = robotSectionInfo.robot.projectId;
+                          const robotDisplayName = msgObj.robotName || connection.robotName;
+                          
+                          const alertEmailKey = `alert-email-${robotSectionInfo.robot.id}-${robotSectionInfo.sectionName}-${parsedMessage.message}`;
+                          
+                          if (!dangerMessagesSet.current.has(alertEmailKey)) {
+                            dangerMessagesSet.current.add(alertEmailKey);
+                            
+                            setTimeout(() => {
+                              dangerMessagesSet.current.delete(alertEmailKey);
+                            }, 30000); 
+                            
+                            sendAlertEmailToProjectUsers(
+                              projectId,
+                              robotDisplayName,
+                              parsedMessage.message,
+                              `Alert: Robot ${robotDisplayName}`
+                            ).catch(error => {
+                              console.error("❌ Failed to send alert email:", error);
+                            });
+                          } else {
+                            console.log("⏭️ Skipping duplicate alert email");
+                          }
+                        }
                       } else {
                         const toastMessage = `ℹ️ ${robotDisplayName} (${parsedMessage.type}): ${parsedMessage.message}`;
                         if (!isToastDuplicate(toastMessage)) {
@@ -1226,6 +1310,31 @@ export function MqttProvider({ children }) {
                           `${msgObj.message.substring(0, 100)}...` : msgObj.message,
                         duration: 8000,
                       });
+                      
+                      if (robotSectionInfo && robotSectionInfo.robot) {
+                        const projectId = robotSectionInfo.robot.projectId;
+                        
+                        const alertEmailKey = `alert-email-${robotSectionInfo.robot.id}-${robotSectionInfo.sectionName}-${msgObj.message}`;
+                        
+                        if (!dangerMessagesSet.current.has(alertEmailKey)) {
+                          dangerMessagesSet.current.add(alertEmailKey);
+                          
+                          setTimeout(() => {
+                            dangerMessagesSet.current.delete(alertEmailKey);
+                          }, 30000);
+                          
+                          sendAlertEmailToProjectUsers(
+                            projectId,
+                            robotDisplayName,
+                            msgObj.message,
+                            `Alert: Robot ${robotDisplayName}`
+                          ).catch(error => {
+                            console.error("❌ Failed to send alert email:", error);
+                          });
+                        } else {
+                          console.log("⏭️ Skipping duplicate alert email");
+                        }
+                      }
                     }
                   } else {
                     const toastMessage = `ℹ️ ${robotDisplayName}: ${msgObj.message}`;
@@ -1297,7 +1406,7 @@ export function MqttProvider({ children }) {
       console.error("Failed to fetch robots from API:", error);
       setIsInitialized(true);
     }
-  }, [API_BASE, isInitialized, fetchInitialData, extractAllDataFromMessage, updateRobotSectionData, processAndSaveMessage, findRobotAndSectionByTopic, handleHalfCycleFinished, shouldShowMessageToUser]);
+  }, [API_BASE, isInitialized, fetchInitialData, extractAllDataFromMessage, updateRobotSectionData, processAndSaveMessage, findRobotAndSectionByTopic, handleHalfCycleFinished, shouldShowMessageToUser, sendAlertEmailToProjectUsers]);
 
   const reconnectConnection = useCallback((robotId, sectionName) => {
     const clientKey = `${robotId}-${sectionName}`;
