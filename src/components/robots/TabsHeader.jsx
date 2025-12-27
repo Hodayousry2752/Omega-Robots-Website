@@ -23,7 +23,7 @@ export default function TabsHeader({ tabs = [], active, onChange, accent = "main
           <button
             key={t.id}
             onClick={() => onChange(t.id)}
-            className={`relative px-5 py-2 text-sm font-medium transition-colors duration-200 
+            className={`relative px-5 max-md:px-2 max-md:py-1 py-2 text-sm font-medium   transition-colors duration-200 
               ${isActive ? "text-main-color" : "text-gray-500 hover:text-gray-700"}`}
             style={{
               borderBottom: isActive ? `3px solid ${accentColor}` : "3px solid transparent",

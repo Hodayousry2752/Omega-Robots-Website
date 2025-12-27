@@ -50,13 +50,13 @@ export default function ScheduleSettings({
   projectId
 }) {
   const { id: robotId } = useParams(); 
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Nun"];
   const [saving, setSaving] = useState(false);
   const [updatingVisibility, setUpdatingVisibility] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [robotData, setRobotData] = useState(null);
   const [robotLoading, setRobotLoading] = useState(true);
   
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Nun"];
   const size = 200;
   const radius = size / 2 - 20;
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -181,11 +181,11 @@ export default function ScheduleSettings({
 
   const getDaysAsBinaryString = () => {
     if (schedule.days.includes("Nun")) {
-      return "0_0_0_0_0_0_0_0";
+      return "0_0_0_0_0_0_0"; 
     } else {
       const regularDays = days.slice(0, 7);
       const regularBinary = regularDays.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
-      return `${regularBinary}_0`;
+      return regularBinary;
     }
   };
 
@@ -212,10 +212,10 @@ export default function ScheduleSettings({
           
           if (schedule.days.includes("Nun")) {
             timeString = "00_00";
-            daysBinaryString = "0_0_0_0_0_0_0_0";
+            daysBinaryString = "0_0_0_0_0_0_0"; 
           } else {
             timeString = `${String(schedule.hour).padStart(2, "0")}_${String(schedule.minute).padStart(2, "0")}`;
-            daysBinaryString = getDaysAsBinaryString();
+            daysBinaryString = getDaysAsBinaryString(); 
           }
           
           const message = `schedule_${timeString}_${daysBinaryString}`;
@@ -238,10 +238,10 @@ export default function ScheduleSettings({
       // Create/update button in database
       let btnName;
       if (schedule.days.includes("Nun")) {
-        btnName = `schedule_00_00_0_0_0_0_0_0_0_0`;
+        btnName = `schedule_00_00_0_0_0_0_0_0_0`; // format: schedule_HH_MM_Sun_Mon_Tue_Wed_Thu_Fri_Sat
       } else {
-        const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
-        btnName = `schedule_${schedule.hour}_${schedule.minute}_${dayFlags.join("_")}`;
+        const dayFlags = days.slice(0, 7).map((d) => (schedule.days.includes(d) ? 1 : 0));
+        btnName = `schedule_${String(schedule.hour).padStart(2, "0")}_${String(schedule.minute).padStart(2, "0")}_${dayFlags.join("_")}`;
       }
 
       const newButton = {
@@ -313,24 +313,6 @@ export default function ScheduleSettings({
         <span className="text-xs text-gray-400">Hover to show visibility control</span>
       </div>
 
-      {/* MQTT Status */}
-      {mqttCredentials ? (
-        <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
-          <div className="text-sm text-green-700">
-            <strong>MQTT Connected:</strong> Using trolley section credentials
-          </div>
-          <div className="text-xs text-green-600 mt-1">
-            Topic: {mqttCredentials.topic}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-          <div className="text-sm text-yellow-700">
-            <strong>MQTT Not Configured:</strong> No car section MQTT credentials found
-          </div>
-        </div>
-      )}
-
       {/* Days */}
       <div className="flex flex-wrap gap-2 mb-4">
         {days.map((d) => (
@@ -353,7 +335,7 @@ export default function ScheduleSettings({
       {schedule.days.includes("Nun") && (
         <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
           <div className="text-sm text-red-700 flex-col justify-center">
-            <span className="ml-2"><strong>⚠️ "Nun" Mode Active:</strong> Schedule will be sent with all zeros (00:00, 0_0_0_0_0_0_0_0)</span>
+            <span className="ml-2"><strong>⚠️ "Nun" Mode Active:</strong> Schedule will be sent with all zeros (00:00, 0_0_0_0_0_0_0)</span>
             <p className="pt-2">This action will delete the current schedule</p>
           </div>
         </div>
@@ -429,7 +411,7 @@ export default function ScheduleSettings({
             Selected Time: {String(schedule.hour).padStart(2, "0")}:{String(schedule.minute).padStart(2, "0")}
             <br />
             <span className="text-sm text-gray-500">
-              ( UTC+3)
+              (UTC+3)
             </span>
           </div>
           <div className="flex gap-2 items-center">
@@ -477,7 +459,7 @@ export default function ScheduleSettings({
           </span>
           <br />
           <span className="text-xs text-gray-500">
-            Binary: {getDaysAsBinaryString()} (Mon-Sun-Nun)
+            Format: schedule_{String(schedule.hour).padStart(2, "0")}_{String(schedule.minute).padStart(2, "0")}_Sun_Mon_Tue_Wed_Thu_Fri_Sat
           </span>
         </div>
         <Button 

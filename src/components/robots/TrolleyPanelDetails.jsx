@@ -1,6 +1,47 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+
+// Function to generate color based on button ID
+const generateColorFromId = (id) => {
+  if (!id) return "#4F46E5";
+  
+  // Convert ID to a number and use it to generate a color
+  const idNum = typeof id === 'string' ? parseInt(id, 10) || 0 : id;
+  
+  // Generate hue based on ID (0-360)
+  const hue = (idNum * 137.508) % 360; // Using golden angle approximation
+  
+  // Fixed saturation and lightness for consistent colors
+  const saturation = 65;
+  const lightness = 50;
+  
+  // Convert HSL to RGB (simplified conversion)
+  const h = hue / 60;
+  const c = (1 - Math.abs(2 * (lightness/100) - 1)) * (saturation/100);
+  const x = c * (1 - Math.abs((h % 2) - 1));
+  let r, g, b;
+  
+  if (h >= 0 && h < 1) { [r, g, b] = [c, x, 0]; }
+  else if (h >= 1 && h < 2) { [r, g, b] = [x, c, 0]; }
+  else if (h >= 2 && h < 3) { [r, g, b] = [0, c, x]; }
+  else if (h >= 3 && h < 4) { [r, g, b] = [0, x, c]; }
+  else if (h >= 4 && h < 5) { [r, g, b] = [x, 0, c]; }
+  else { [r, g, b] = [c, 0, x]; }
+  
+  const m = (lightness/100) - c/2;
+  r = Math.round((r + m) * 255);
+  g = Math.round((g + m) * 255);
+  b = Math.round((b + m) * 255);
+  
+  // Convert to hex
+  const toHex = (n) => {
+    const hex = n.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
 
 export default function TrolleyPanelDetails({
   robotId,
@@ -11,12 +52,9 @@ export default function TrolleyPanelDetails({
 }) {
   const safeImgSrc = imgSrc && imgSrc.trim() !== "" ? imgSrc : "/assets/placeholder-trolley.jpg";
   const carSection = trolleyData?.Sections?.car || {};
-  const [buttonsWithColors, setButtonsWithColors] = useState([]);
   const [updatingButtons, setUpdatingButtons] = useState({});
   const [updatingValues, setUpdatingValues] = useState({});
   const [showMqttPassword, setShowMqttPassword] = useState(false);
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost/robots_web_apis";
-  const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL || "http://localhost/robots_web_apis/uploads";
 
   // Get storage key for this robot's trolley button visibility
   const getStorageKey = () => `robot_${trolleyData?.id}_trolley_button_visibility`;
@@ -62,22 +100,6 @@ export default function TrolleyPanelDetails({
     }
   };
 
-  useEffect(() => {
-    const fetchButtons = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/buttons.php`);
-        if (res.ok) {
-          const data = await res.json();
-          setButtonsWithColors(data || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch buttons", err);
-        setButtonsWithColors([]);
-      }
-    };
-    fetchButtons();
-  }, [BASE_URL]);
-
   const getActiveButtons = () => {
     if (!carSection.ActiveBtns) return [];
     
@@ -95,13 +117,9 @@ export default function TrolleyPanelDetails({
 
   const activeButtons = getActiveButtons();
 
-  const getButtonColor = (btnName) => {
-    if (!btnName) return "#4F46E5";
-    
-    const btnData = buttonsWithColors.find(
-      (b) => b.BtnName?.toLowerCase() === btnName?.toLowerCase()
-    );
-    return btnData?.Color || "#4F46E5";
+  // Get button color based on ID
+  const getButtonColor = (btnId) => {
+    return generateColorFromId(btnId);
   };
 
   const handleButtonClick = (btnName) => {
@@ -199,14 +217,6 @@ export default function TrolleyPanelDetails({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-md p-6 transition hover:shadow-lg">
       <div className="flex flex-col md:flex-row gap-6">
-        {/* <div className="flex flex-col items-center md:items-start w-full md:w-1/3">
-          <img
-            src={safeImgSrc}
-            alt="trolley"
-            className="w-48 h-40 object-cover rounded-xl border border-gray-200 shadow-sm"
-          />
-        </div> */}
-
         <div className="flex-1 grid grid-cols-2 gap-4">
           <ViewFieldWithVisibility 
             label="Voltage" 
@@ -267,6 +277,7 @@ export default function TrolleyPanelDetails({
                 const btnName = typeof btn === "object" && btn !== null ? btn.Name || btn.name || "" : btn;
                 const btnId = btn.id || btnName || `btn-${index}`;
                 const isVisible = isButtonVisible(btnId);
+                const buttonColor = btn.Color || getButtonColor(btnId);
                 
                 // Skip schedule buttons in trolley section
                 if (btnName.toLowerCase().includes('schedule')) {
@@ -280,8 +291,8 @@ export default function TrolleyPanelDetails({
                       onClick={() => handleButtonClick(btnName)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl border select-none cursor-pointer hover:opacity-90 transition-all min-w-[120px] justify-center"
                       style={{
-                        backgroundColor: getButtonColor(btnName),
-                        borderColor: getButtonColor(btnName),
+                        backgroundColor: buttonColor,
+                        borderColor: buttonColor,
                         color: "#fff",
                       }}
                     >

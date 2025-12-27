@@ -14,6 +14,7 @@ export default function Robots() {
   const { projectName, userName } = useAuth();
   const [robots, setRobots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentProject, setCurrentProject] = useState(null);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL;
@@ -38,16 +39,17 @@ export default function Robots() {
         const projects = await getData(`${BASE_URL}/projects`);
         const projectsArray = Array.isArray(projects) ? projects : [projects];
         
-        const currentProject = projectsArray.find(
+        const foundProject = projectsArray.find(
           project => project.ProjectName?.trim() === projectName.trim()
         );
 
-        if (currentProject) {
-          const projectId = currentProject.id || currentProject.projectId;
+        if (foundProject) {
+          const projectId = foundProject.id || foundProject.projectId;
           filteredRobots = robotsArray.filter(robot => {
             const robotProjectId = robot.projectId || robot.project_id;
             return robotProjectId == projectId;
           });
+          setCurrentProject(foundProject);
         }
       }
 
@@ -99,13 +101,13 @@ export default function Robots() {
       <section className="container mx-auto px-6 py-24 relative">
         {/* Back Button */}
        
-        <Button
+        {/* <Button
           onClick={() => navigate(-1)}
           className=" left-0 flex mt-5 items-center gap-2 bg-transparent text-main-color border border-main-color hover:bg-main-color/10 cursor-pointer"
         >
           <ArrowLeft size={18} />
           Back
-        </Button>
+        </Button> */}
         <motion.h2
           className="text-4xl font-bold text-gray-900 mb-4 text-center"
           initial={{ opacity: 0, y: 40 }}
@@ -121,7 +123,7 @@ export default function Robots() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-gray-600 mb-4">
             {projectName ? (
               <>Project: <span className="font-semibold text-main-color">{projectName}</span></>
             ) : (
@@ -129,6 +131,22 @@ export default function Robots() {
             )}
           </p>
           
+          {projectName && currentProject && currentProject.Image && (
+            <motion.div
+              className="relative w-full max-w-2xl mx-auto px-4 lg:px-6"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="relative w-full  lg:w-4/5 mx-auto aspect-[3/2] overflow-hidden rounded-xl shadow-md bg-gradient-to-br from-gray-50 to-gray-100">
+                <img
+                  src={`${UPLOADS_URL}/${currentProject.Image}`}
+                  alt={projectName}
+                  className="w-full h-3/4 object-contain  p-3 transition-all duration-500 ease-in-out hover:scale-105"
+                />
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
         {robots.length === 0 ? (

@@ -122,7 +122,6 @@ export default function RobotDetails() {
   const [activeTrolleyTab, setActiveTrolleyTab] = useState("controls");
   const [isResetting, setIsResetting] = useState(false);
   const [buttonsWithColors, setButtonsWithColors] = useState([]);
-  const [scheduleData, setScheduleData] = useState(null);
   
   const [robotSectionLocked, setRobotSectionLocked] = useState(true);
   const [robotPasswordInput, setRobotPasswordInput] = useState("");
@@ -144,17 +143,24 @@ export default function RobotDetails() {
 
   const isControlsTab = (tab) => tab === "controls";
   
+  const hasTrolley = robot?.isTrolley == 1 || robot?.isTrolley === "true" || robot?.isTrolley === true;
+  
   const shouldShowTrolleySection = () => {
-    return isControlsTab(activeTrolleyTab) && isControlsTab(activeTab);
-  };
-
-  const shouldShowScheduleSection = () => {
-    const hasTrolley = robot?.isTrolley == 1 || robot?.isTrolley === "true" || robot?.isTrolley === true;
-    return isControlsTab(activeTab) && isControlsTab(activeTrolleyTab) && hasTrolley;
+    return hasTrolley && isControlsTab(activeTrolleyTab) && isControlsTab(activeTab);
   };
 
   const shouldShowRobotSection = () => {
     return isControlsTab(activeTab) && isControlsTab(activeTrolleyTab);
+  };
+
+  const shouldShowScheduleSection = () => {
+    // Schedule should only show under trolley section if there IS a trolley
+    return isControlsTab(activeTab) && isControlsTab(activeTrolleyTab) && hasTrolley;
+  };
+
+  const shouldShowRobotSchedule = () => {
+    // Robot schedule should only show under robot section if there is NO trolley
+    return isControlsTab(activeTab) && isControlsTab(activeTrolleyTab) && !hasTrolley;
   };
 
   const isInNonControlsView = () => {
@@ -168,6 +174,14 @@ export default function RobotDetails() {
   };
 
   const fetchUserRobotPassword = useCallback(async () => {
+    if (!hasTrolley) {
+      console.log("🚫 Robot only mode - no password required");
+      setRobotSectionLocked(false);
+      saveRobotLockState(id, { locked: false, unlockedAt: Date.now() });
+      setUserPasswordLoading(false);
+      return;
+    }
+    
     if (!userName) {
       console.log("❌ No userName available, skipping robot password fetch");
       return;
@@ -205,7 +219,7 @@ export default function RobotDetails() {
     } finally {
       setUserPasswordLoading(false);
     }
-  }, [userName, BASE_URL, id]);
+  }, [userName, BASE_URL, id, hasTrolley]);
 
   useEffect(() => {
     const lockState = loadRobotLockState(id);
@@ -322,7 +336,6 @@ export default function RobotDetails() {
       
       const updatedRobot = await fetchRobotData();
       await fetchButtonColors();
-      await fetchScheduleData();
       
       console.log("✅ All data refreshed successfully");
       
@@ -340,18 +353,21 @@ export default function RobotDetails() {
       const targetRobot = robotData || robot;
       if (!targetRobot) return;
       
-      const carSection = targetRobot?.Sections?.car;
-      if (!carSection || !carSection.ActiveBtns) {
+      
+      const section = hasTrolley ? 'car' : 'main';
+      const targetSection = targetRobot?.Sections?.[section];
+      
+      if (!targetSection || !targetSection.ActiveBtns) {
         setScheduleButton(null);
         return;
       }
 
       let activeBtns = [];
       try {
-        if (Array.isArray(carSection.ActiveBtns)) {
-          activeBtns = carSection.ActiveBtns;
-        } else if (typeof carSection.ActiveBtns === "string") {
-          activeBtns = JSON.parse(carSection.ActiveBtns);
+        if (Array.isArray(targetSection.ActiveBtns)) {
+          activeBtns = targetSection.ActiveBtns;
+        } else if (typeof targetSection.ActiveBtns === "string") {
+          activeBtns = JSON.parse(targetSection.ActiveBtns);
         }
       } catch {
         activeBtns = [];
@@ -377,25 +393,17 @@ export default function RobotDetails() {
 
   useEffect(() => {
     if (robot) {
-      const hasTrolley = robot?.isTrolley == 1 || robot?.isTrolley === "true" || robot?.isTrolley === true;
-      if (hasTrolley) {
-        findScheduleButton();
-      } else {
-        setScheduleButton(null);
-      }
+      findScheduleButton();
     }
-  }, [robot]);
+  }, [robot, hasTrolley]);
 
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
         
-        await fetchUserRobotPassword();
-        
         await fetchRobotData();
         await fetchButtonColors();
-        await fetchScheduleData();
         
       } catch (error) {
         console.error("❌ Error loading initial data:", error);
@@ -437,30 +445,11 @@ export default function RobotDetails() {
     };
   }, [id, loading, fetchAllData]);
 
-  const fetchScheduleData = async () => {
-    try {
-      const hasTrolley = robot?.isTrolley == 1 || robot?.isTrolley === "true" || robot?.isTrolley === true;
-      if (hasTrolley) {
-        const scheduleRes = await getData(`${BASE_URL}/schedule/${id}`);
-        setScheduleData(scheduleRes || {
-          days: [],
-          hour: 8,
-          minute: 0,
-          active: true
-        });
-      } else {
-        setScheduleData(null);
-      }
-    } catch (error) {
-      console.error("Failed to load schedule data:", error);
-      setScheduleData({
-        days: [],
-        hour: 8,
-        minute: 0,
-        active: true
-      });
+  useEffect(() => {
+    if (robot) {
+      fetchUserRobotPassword();
     }
-  };
+  }, [robot, fetchUserRobotPassword]);
 
   const handleResetTimer = async () => {
     setIsResetting(true);
@@ -793,12 +782,6 @@ export default function RobotDetails() {
               </Button>
             </div>
           )}
-          
-          {/* <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-            <p className="text-gray-500 text-sm">
-              User: <span className="font-medium text-gray-700">{userName}</span>
-            </p>
-          </div> */}
         </div>
       </motion.div>
     );
@@ -807,7 +790,7 @@ export default function RobotDetails() {
   const renderRobotControls = () => {
     if (!robot) return null;
     
-    if (robotSectionLocked) {
+    if (hasTrolley && robotSectionLocked) {
       return renderRobotPasswordPrompt();
     }
     
@@ -822,19 +805,6 @@ export default function RobotDetails() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        {/* {!robotSectionLocked && userRobotPassword && userRobotPassword.trim() !== "" && (
-          <div className="flex justify-end mb-4">
-            <Button
-              onClick={handleLockRobotSection}
-              variant="outline"
-              className="flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-full"
-            >
-              <Lock className="w-4 h-4" />
-              Lock Robot Section
-            </Button>
-          </div>
-        )} */}
-        
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 sm:gap-0">
           <div className="flex flex-col text-left text-base sm:text-lg font-medium text-gray-800 gap-2">
             {valueVisibility["voltage"] !== false && (
@@ -1120,25 +1090,26 @@ export default function RobotDetails() {
                       />
                     )}
                   </div>
-                </>
-              )}
 
-              {shouldShowScheduleSection() && (
-                <>
-                  <div className="mb-6 mt-16">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-green-600 text-center">
-                      Schedule Settings
-                    </h2>
-                  </div>
+                  {/* Schedule under trolley section when there IS a trolley */}
+                  {shouldShowScheduleSection() && (
+                    <>
+                      <div className="mb-6 mt-16">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-green-600 text-center">
+                          Schedule Settings
+                        </h2>
+                      </div>
 
-                  <div className="bg-white rounded-3xl shadow-lg p-6 sm:p-10 border border-gray-100">
-                    <ScheduleDisplay
-                      scheduleButton={scheduleButton}
-                      publish={(topic, message) => publishButtonMessage(id, "car", topic, message)}
-                      topic={robot?.Sections?.car?.Topic_main}
-                      loading={scheduleLoading}
-                    />
-                  </div>
+                      <div className="bg-white rounded-3xl shadow-lg p-6 sm:p-10 border border-gray-100">
+                        <ScheduleDisplay
+                          scheduleButton={scheduleButton}
+                          section="car"
+                          publish={(topic, message) => publishButtonMessage(id, "car", topic, message)}
+                          loading={scheduleLoading}
+                        />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1175,6 +1146,26 @@ export default function RobotDetails() {
                         sectionName="main" 
                         publish={(topic, message) => publishButtonMessage(id, "main", topic, message)}
                       />
+                    )}
+
+                    {/* Schedule under robot section when there is NO trolley */}
+                    {shouldShowRobotSchedule() && (
+                      <div className="mt-12 pt-8 border-t border-gray-200">
+                        <div className="mb-6">
+                          <h2 className="text-2xl sm:text-3xl font-bold text-green-600 text-center">
+                            Schedule Settings
+                          </h2>
+                        </div>
+
+                        <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                          <ScheduleDisplay
+                            scheduleButton={scheduleButton}
+                            section="main"
+                            publish={(topic, message) => publishButtonMessage(id, "main", topic, message)}
+                            loading={scheduleLoading}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 </>

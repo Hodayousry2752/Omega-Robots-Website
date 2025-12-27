@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Mail, MessageCircle, Globe2 } from "lucide-react";
 import LogoImg from "../assets/logo omega-2022.png";
+import { BsWhatsapp } from "react-icons/bs";
 
 export default function Footer() {
   return (
@@ -74,7 +75,7 @@ export default function Footer() {
               whileHover={{ scale: 1.15 }}
               className="p-2 rounded-full border border-second-color text-second-color hover:border-main-color hover:text-main-color transition-all duration-300"
             >
-              <MessageCircle size={18} />
+              <BsWhatsapp className="w-5 h-5 object-contain" />
             </motion.a>
           </div>
 

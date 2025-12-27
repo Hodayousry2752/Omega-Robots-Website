@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import Home from "../pages/Home";
 import Login from "../pages/Login";
 import Robots from "../pages/Robots";
 import RobotDetails from "../pages/RobotDetails";
@@ -93,18 +92,11 @@ export default function AppRoutes() {
                 path="/"
                 element={
                   <Layout>
-                    <Home />
+                    <Robots />
                   </Layout>
                 }
               />
-              <Route
-                path="/home"
-                element={
-                  <Layout>
-                    <Home />
-                  </Layout>
-                }
-              />
+             
               <Route
                 path="/robots"
                 element={

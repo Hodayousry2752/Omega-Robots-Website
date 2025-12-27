@@ -13,6 +13,26 @@ const isLoginPage = () => {
   return hash === '#/' || hash === '#/login' || hash === '';
 };
 
+
+const isLoginToast = (message) => {
+  if (!message) return false;
+  
+  const loginErrorMessages = [
+    "Please enter both username and password",
+    "Invalid username or password",
+    "Password is incorrect",
+    "Username or password is incorrect",
+    "Password loaded from saved credentials",
+    "Your credentials have been saved for future logins",
+    "Network error. Please check your connection and try again.",
+    "You are already logged in!"
+  ];
+  
+  return loginErrorMessages.some(errorMsg => 
+    typeof message === 'string' && message.includes(errorMsg)
+  );
+};
+
 const createToastInterceptor = () => {
   const originalToast = { ...toast };
   
@@ -23,7 +43,19 @@ const createToastInterceptor = () => {
     if (typeof originalFunc === 'function') {
       toast[funcName] = function(...args) {
         if (isLoginPage()) {
-          console.log(` Toast ${funcName} blocked on login page`);
+          const firstArg = args[0];
+          let message = firstArg;
+          
+          if (funcName === 'promise' && args[0]) {
+            message = args[0];
+          }
+          
+          if (isLoginToast(message)) {
+            console.log(`✅ Allowing login toast: ${message}`);
+            return originalFunc.apply(this, args);
+          }
+          
+          console.log(`❌ Blocking non-login toast on login page: ${message}`);
           if (funcName === 'promise') {
             return Promise.resolve();
           }
@@ -168,16 +200,12 @@ function MqttStatusIndicator() {
   );
 }
 
-// مكون Toaster مخصص يعطل نفسه في صفحة Login
 function ConditionalToaster() {
-  const [showToaster, setShowToaster] = useState(!isLoginPage());
+  const [showToaster, setShowToaster] = useState(true); 
   
   useEffect(() => {
     const checkAndUpdate = () => {
-      const shouldShow = !isLoginPage();
-      if (shouldShow !== showToaster) {
-        setShowToaster(shouldShow);
-      }
+      setShowToaster(true);
     };
     
     const handleHashChange = () => {
@@ -204,7 +232,7 @@ function ConditionalToaster() {
       history.pushState = originalPushState;
       history.replaceState = originalReplaceState;
     };
-  }, [showToaster]);
+  }, []);
   
   if (!showToaster) {
     return null;

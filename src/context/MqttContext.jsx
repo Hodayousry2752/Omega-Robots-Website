@@ -416,7 +416,7 @@ export function MqttProvider({ children }) {
       }
 
       let finalType = messageType;
-      if (extractedVoltage !== null && extractedVoltage < 15) {
+      if (extractedVoltage !== null && extractedVoltage < 23 && extractedVoltage > 10) {
         finalType = "alert";
       }
 
@@ -435,7 +435,7 @@ export function MqttProvider({ children }) {
         finalMessageObj.voltage = extractedVoltage;
       }
 
-      if (extractedVoltage !== null && extractedVoltage < 15) {
+      if (extractedVoltage !== null && extractedVoltage < 23 && extractedVoltage > 10) {
         console.log(`🔴 LOW VOLTAGE DETECTED: ${extractedVoltage}V`);
         
         const lowVoltageKey = `low-${robotId}-${sectionName}-${extractedVoltage}`;
@@ -496,8 +496,8 @@ export function MqttProvider({ children }) {
         }
       }
       
-      // Check if this is a normal voltage update (15 or more)
-      if (extractedVoltage !== null && extractedVoltage >= 15) {
+      // Check if this is a normal voltage update 
+      if (extractedVoltage !== null && extractedVoltage < 23 && extractedVoltage > 10) {
         console.log(`🟢 NORMAL VOLTAGE UPDATE: ${extractedVoltage}V`);
         
         const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
@@ -1001,7 +1001,7 @@ export function MqttProvider({ children }) {
 
       const response = await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
       
-      if (updatedData.voltage !== undefined && updatedData.voltage >= 15) {
+      if (updatedData.voltage !== undefined && updatedData.voltage < 23 && updatedData.voltage > 10) {
         const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
         if (shouldShow) {
           const toastMessage = `✅ Voltage updated for robot "${robotName}" to ${updatedData.voltage}V`;
@@ -1028,7 +1028,7 @@ export function MqttProvider({ children }) {
       }
       
       // For low voltage, trigger the alert system
-      if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
+      if (updatedData.voltage !== undefined && updatedData.voltage < 23 && updatedData.voltage > 10) {
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       
@@ -1041,7 +1041,7 @@ export function MqttProvider({ children }) {
       await updateAllFieldsSeparately(robotId, sectionName, updatedData);
       
       // For low voltage, trigger the alert system
-      if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
+      if (updatedData.voltage !== undefined && updatedData.voltage < 23 && updatedData.voltage > 10) {
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       

@@ -193,7 +193,7 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white shadow-sm border-b border-gray-100">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-5 md:px-10 py-3 relative">
-        <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => navigate("/home")}>
+        <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => navigate("/robots")}>
           <motion.img src={LogoImg} alt="Logo" className="h-9 w-auto object-contain" whileHover={{ scale: 1.05 }} />
         </div>
 

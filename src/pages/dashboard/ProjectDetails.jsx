@@ -22,9 +22,25 @@ import { deleteData } from "@/services/deleteServices";
 import RobotImg from "../../assets/Robot1.jpg";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import mqtt from "mqtt"; // Import MQTT directly
+import mqtt from "mqtt";
 
-// ConfirmDeleteModal component (unchanged)
+// Function to format time for MQTT
+const formatTimeForMQTT = () => {
+  const now = new Date();
+  const pad = (num) => num.toString().padStart(2, '0');
+  
+  const year = now.getFullYear();
+  const weekday = now.getDay(); // 0-6 (Sunday=0, Monday=1, etc.)
+  const month = pad(now.getMonth() + 1);
+  const day = pad(now.getDate());
+  const hour = pad(now.getHours());
+  const minute = pad(now.getMinutes());
+  const second = pad(now.getSeconds());
+  
+  return `set_time_${year}_${weekday}_${month}_${day}_${hour}_${minute}_${second}`;
+};
+
+// ConfirmDeleteModal component
 function ConfirmDeleteModal({
   robot = null,
   deleteAll = false,
@@ -100,7 +116,7 @@ const createMqttClient = (mqttUrl, mqttUsername, mqttPassword) => {
       username: mqttUsername,
       password: mqttPassword,
       clientId: `clientId-${Math.random().toString(16).substr(2, 8)}`,
-      reconnectPeriod: 0, // No auto-reconnect for one-time operations
+      reconnectPeriod: 0,
     });
 
     client.on('connect', () => {
@@ -111,7 +127,6 @@ const createMqttClient = (mqttUrl, mqttUsername, mqttPassword) => {
       reject(error);
     });
 
-    // Timeout after 10 seconds
     setTimeout(() => {
       reject(new Error('MQTT connection timeout'));
       client.end();
@@ -126,7 +141,7 @@ const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic
     
     return new Promise((resolve, reject) => {
       client.publish(topic, message, (error) => {
-        client.end(); // Always close connection after publish
+        client.end();
         
         if (error) {
           reject(error);
@@ -135,7 +150,6 @@ const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic
         }
       });
 
-      // Timeout for publish operation
       setTimeout(() => {
         client.end();
         reject(new Error('Publish timeout'));
@@ -276,16 +290,8 @@ export default function ProjectDetails() {
 
     setIsSettingTime(true);
 
-    const now = new Date();
-    const dateString = now.toLocaleDateString("en-GB");
-    const timeString = now.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-
-    const message = `set_time_${dateString.replace(/\//g, "_")}_${timeString.replace(/:/g, "_")}`;
+    // Use the correct time format
+    const message = formatTimeForMQTT();
 
     let results = {
       mainTopics: 0,
@@ -390,7 +396,7 @@ export default function ProjectDetails() {
     const btnData = buttonsWithColors.find(
       (b) => b.BtnName?.toLowerCase() === btnName.toLowerCase()
     );
-    return btnData?.Color || "#4F46E5"; // default
+    return btnData?.Color || "#4F46E5";
   };
 
   if (loading) {

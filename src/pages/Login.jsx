@@ -160,7 +160,18 @@ export default function Login() {
         if (credentials && credentials.username.toLowerCase() === selectedUsername.toLowerCase()) {
           setPassword(credentials.password);
           setRememberMe(true);
-          toast.info("Password loaded from saved credentials");
+          toast.info("Password loaded from saved credentials", {
+            style: { 
+              background: '#3b82f6', 
+              color: 'white',
+              border: '2px solid #1d4ed8',
+              fontSize: '14px',
+              fontWeight: '500'
+            },
+            icon: '🔑',
+            position: 'top-center',
+            duration: 3000
+          });
         } else {
           setPassword("");
           setRememberMe(false);
@@ -175,14 +186,36 @@ export default function Login() {
     const updatedUsernames = savedUsernames.filter(u => u !== usernameToRemove);
     setSavedUsernames(updatedUsernames);
     localStorage.setItem("omega_saved_usernames", JSON.stringify(updatedUsernames));
-    toast.info(`"${usernameToRemove}" removed from suggestions`);
+    toast.info(`"${usernameToRemove}" removed from suggestions`, {
+      style: { 
+        background: '#f59e0b', 
+        color: 'white',
+        border: '2px solid #d97706',
+        fontSize: '14px',
+        fontWeight: '500'
+      },
+      icon: '🗑️',
+      position: 'top-center',
+      duration: 3000
+    });
   };
 
   const clearAllSuggestions = () => {
     if (window.confirm("Are you sure you want to clear all saved usernames?")) {
       setSavedUsernames([]);
       localStorage.removeItem("omega_saved_usernames");
-      toast.success("All saved usernames cleared");
+      toast.success("All saved usernames cleared", {
+        style: { 
+          background: '#10b981', 
+          color: 'white',
+          border: '2px solid #059669',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '✅',
+        position: 'top-center',
+        duration: 3000
+      });
     }
   };
 
@@ -190,12 +223,34 @@ export default function Login() {
     e.preventDefault();
     
     if (isAuthenticated) {
-      toast.info("You are already logged in!");
+      toast.info("You are already logged in!", {
+        style: { 
+          background: '#3b82f6', 
+          color: 'white',
+          border: '2px solid #1d4ed8',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: 'ℹ️',
+        position: 'top-center',
+        duration: 3000
+      });
       return;
     }
     
     if (!username.trim() || !password.trim()) {
-      toast.error("Please enter both username and password");
+      toast.error("Please enter both username and password", {
+        style: { 
+          background: '#ef4444', 
+          color: 'white',
+          border: '2px solid #dc2626',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '⚠️',
+        position: 'top-center',
+        duration: 4000
+      });
       return;
     }
     
@@ -237,6 +292,24 @@ export default function Login() {
       let loginSuccessful = false;
       let userData = null;
       let successfulUsername = "";
+      let usernameExists = false;
+
+      // First, check if the username exists in the system
+      try {
+        const allUsersResponse = await postData(`${BASE_URL}/get-users`, {});
+        if (allUsersResponse && Array.isArray(allUsersResponse)) {
+          const matchingUser = allUsersResponse.find(
+            user => (user.Username || user.username).toLowerCase() === originalUsername.toLowerCase()
+          );
+          
+          if (matchingUser) {
+            usernameExists = true;
+          }
+        }
+      } catch (fetchError) {
+        console.log("Could not fetch users list:", fetchError);
+        // Continue with login attempts even if we couldn't fetch users list
+      }
 
       for (const attempt of loginAttempts) {
         try {
@@ -265,43 +338,51 @@ export default function Login() {
           password
         );
       } else {
-        // If all attempts fail, try one more thing: check if there's a username
-        // in the database that matches case-insensitively
-        try {
-          const allUsersResponse = await postData(`${BASE_URL}/get-users`, {});
-          if (allUsersResponse && Array.isArray(allUsersResponse)) {
-            const matchingUser = allUsersResponse.find(
-              user => (user.Username || user.username).toLowerCase() === originalUsername.toLowerCase()
-            );
-            
-            if (matchingUser) {
-              // Try with the exact username from database
-              const finalAttempt = await postData(`${BASE_URL}/login`, {
-                username: matchingUser.Username || matchingUser.username,
-                password,
-              });
-              
-              if (finalAttempt?.message === "Login successful" && finalAttempt?.user) {
-                console.log(`✅ Login successful with database case: ${matchingUser.Username || matchingUser.username}`);
-                await handleSuccessfulLogin(
-                  finalAttempt.user,
-                  originalUsername,
-                  matchingUser.Username || matchingUser.username,
-                  password
-                );
-                return;
-              }
-            }
-          }
-        } catch (fetchError) {
-          console.log("Could not fetch users list:", fetchError);
+        // If all attempts fail, show appropriate error message
+        if (usernameExists) {
+          // Username exists but password is wrong
+          toast.error("Password is incorrect", {
+            style: { 
+              background: '#ef4444', 
+              color: 'white',
+              border: '2px solid #dc2626',
+              fontSize: '14px',
+              fontWeight: '500'
+            },
+            icon: '',
+            position: 'top-center',
+            duration: 4000
+          });
+        } else {
+          // Either username doesn't exist or both are wrong
+          toast.error("Username or password is incorrect", {
+            style: { 
+              background: '#ef4444', 
+              color: 'white',
+              border: '2px solid #dc2626',
+              fontSize: '14px',
+              fontWeight: '500'
+            },
+            icon: '',
+            position: 'top-center',
+            duration: 4000
+          });
         }
-        
-        toast.error("Invalid username or password");
       }
     } catch (error) {
       console.error("Login error:", error);
-      toast.error("Network error. Please check your connection and try again.");
+      toast.error("Network error. Please check your connection and try again.", {
+        style: { 
+          background: '#ef4444', 
+          color: 'white',
+          border: '2px solid #dc2626',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '🌐',
+        position: 'top-center',
+        duration: 4000
+      });
     } finally {
       setLoading(false);
     }
@@ -320,16 +401,49 @@ export default function Login() {
 
     if (rememberMe) {
       saveCredentials(actualUsername, actualPassword);
-      toast.info("Your credentials have been saved for future logins");
+      toast.info("Your credentials have been saved for future logins", {
+        style: { 
+          background: '#3b82f6', 
+          color: 'white',
+          border: '2px solid #1d4ed8',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '💾',
+        position: 'top-center',
+        duration: 3000
+      });
     } else {
       clearSavedCredentials();
     }
 
     if (isAdminUser) {
-      toast.success(`Welcome back, Admin ${displayUsername}!`);
+      toast.success(`Welcome back, Admin ${displayUsername}!`, {
+        style: { 
+          background: '#10b981', 
+          color: 'white',
+          border: '2px solid #059669',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '👋',
+        position: 'top-center',
+        duration: 3000
+      });
       navigate("/homeDashboard", { replace: true });
     } else {
-      toast.success(`Welcome back, ${displayUsername}!`);
+      toast.success(`Welcome back, ${displayUsername}!`, {
+        style: { 
+          background: '#10b981', 
+          color: 'white',
+          border: '2px solid #059669',
+          fontSize: '14px',
+          fontWeight: '500'
+        },
+        icon: '👋',
+        position: 'top-center',
+        duration: 3000
+      });
       navigate("/robots", { replace: true });
     }
   };
@@ -388,7 +502,7 @@ export default function Login() {
               transition={{ duration: 0.7 }}
             />
             <CardTitle className="text-3xl font-extrabold text-main-color tracking-tight">
-              Welcome Back
+              Omega Engineering Industries
             </CardTitle>
             <CardDescription className="text-gray-500 text-sm">
               Sign in to access your Omega Robotics
@@ -410,7 +524,7 @@ export default function Login() {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Enter username (case insensitive)"
+                    placeholder="Enter username"
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);

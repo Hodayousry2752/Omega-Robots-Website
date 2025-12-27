@@ -120,7 +120,7 @@ export default function RobotCard({ robot, onView }) {
               </span>
             </div>
 
-            <div className="leading-relaxed flex items-center gap-1">
+            {/* <div className="leading-relaxed flex items-center gap-1">
               <span>Trolley:</span>
               <span className="font-semibold">
                 {isTrolley ? (
@@ -129,7 +129,7 @@ export default function RobotCard({ robot, onView }) {
                   <span className="text-red-500 flex items-center gap-1">🔴 No</span>
                 )}
               </span>
-            </div>
+            </div> */}
 
             {/* Active Buttons with colors from buttons.php */}
             {/* <div className="mt-2">

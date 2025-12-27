@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { getData } from "@/services/getServices";
 import { postData} from "@/services/postServices";
@@ -45,10 +45,11 @@ const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic
 
 export default function ScheduleDisplay({ 
   scheduleButton,
-  loading = false
+  loading = false,
+  section // 'car' or 'main'
 }) {
   const { id: robotId } = useParams();
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Nun"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Nun"];
   const [schedule, setSchedule] = useState({ days: [], hour: "", minute: 0, active: true });
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -78,18 +79,18 @@ export default function ScheduleDisplay({
     fetchRobotData();
   }, [robotId, BASE_URL]);
 
-  // Get MQTT credentials from car section
-  const getMqttCredentials = () => {
-    if (!robotData?.Sections?.car) return null;
+  // Get MQTT credentials from the specified section
+  const getMqttCredentials = useCallback(() => {
+    if (!robotData?.Sections?.[section]) return null;
     
-    const carSection = robotData.Sections.car;
+    const targetSection = robotData.Sections[section];
     return {
-      mqttUrl: carSection.mqttUrl,
-      mqttUsername: carSection.mqttUsername,
-      mqttPassword: carSection.mqttPassword,
-      topic: carSection.Topic_main
+      mqttUrl: targetSection.mqttUrl,
+      mqttUsername: targetSection.mqttUsername,
+      mqttPassword: targetSection.mqttPassword,
+      topic: targetSection.Topic_main
     };
-  };
+  }, [robotData, section]);
 
   const mqttCredentials = getMqttCredentials();
 
@@ -127,7 +128,9 @@ export default function ScheduleDisplay({
     try {
       const parts = btnName.split('_');
       
-      if (parts.length < 11 || parts[0] !== 'schedule') {
+      // format: schedule_HH_MM_Sun_Mon_Tue_Wed_Thu_Fri_Sat
+      // parts length should be 10: schedule + hour + minute + 7 days
+      if (parts.length < 10 || parts[0] !== 'schedule') {
         console.warn('Invalid schedule format:', btnName);
         return null;
       }
@@ -135,7 +138,7 @@ export default function ScheduleDisplay({
       return {
         hour: parseInt(parts[1]),
         minute: parseInt(parts[2]),
-        daysBinary: parts.slice(3, 11).join(''),
+        daysBinary: parts.slice(3, 10).join(''),
         rawData: btnName
       };
     } catch (error) {
@@ -145,22 +148,28 @@ export default function ScheduleDisplay({
   };
 
   const getActiveDaysFromBinary = (binaryString) => {
-    if (!binaryString || binaryString.length !== 8) return [];
+    if (!binaryString || binaryString.length !== 7) return [];
     
     const activeDays = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 7; i++) {
       if (binaryString[i] === '1') {
-        activeDays.push(days[i]);
+        activeDays.push(days[i]); // days array: Sun, Mon, Tue, Wed, Thu, Fri, Sat
       }
     }
+    
+    
+    if (binaryString === '0000000') {
+      activeDays.push("Nun");
+    }
+    
     return activeDays;
   };
 
   const getDaysAsBinaryString = () => {
     if (schedule.days.includes("Nun")) {
-      return "0_0_0_0_0_0_0_0";
+      return "0_0_0_0_0_0_0"; 
     } else {
-      return days.map(day => schedule.days.includes(day) ? '1' : '0').join('_');
+      return days.slice(0, 7).map(day => schedule.days.includes(day) ? '1' : '0').join('_');
     }
   };
 
@@ -261,12 +270,12 @@ export default function ScheduleDisplay({
           
           if (schedule.days.includes("Nun")) {
             timeString = "00_00";
-            daysBinaryString = "0_0_0_0_0_0_0_0";
+            daysBinaryString = "0_0_0_0_0_0_0"; 
           } else {
             const hourNum = parseInt(schedule.hour) || 0;
             const hour24 = String(hourNum).padStart(2, "0");
             timeString = `${hour24}_${String(schedule.minute).padStart(2, "0")}`;
-            daysBinaryString = getDaysAsBinaryString();
+            daysBinaryString = getDaysAsBinaryString(); 
           }
           
           const message = `schedule_${timeString}_${daysBinaryString}`;
@@ -291,11 +300,11 @@ export default function ScheduleDisplay({
         let btnName;
         
         if (schedule.days.includes("Nun")) {
-          btnName = `schedule_00_00_0_0_0_0_0_0_0_0`;
+          btnName = `schedule_00_00_0_0_0_0_0_0_0`; // format: schedule_HH_MM_Sun_Mon_Tue_Wed_Thu_Fri_Sat
         } else {
           const hourNum = parseInt(schedule.hour) || 0;
           const hour24 = String(hourNum).padStart(2, "0");
-          const dayFlags = days.map((d) => (schedule.days.includes(d) ? 1 : 0));
+          const dayFlags = days.slice(0, 7).map((d) => (schedule.days.includes(d) ? 1 : 0));
           btnName = `schedule_${hour24}_${String(schedule.minute).padStart(2, "0")}_${dayFlags.join("_")}`;
         }
 
@@ -306,7 +315,7 @@ export default function ScheduleDisplay({
           Operation: "/start",
         };
 
-        await postData(`${BASE_URL}/buttons.php?section=car&id=${scheduleButton.id}`, updatedButton);
+        await postData(`${BASE_URL}/buttons.php?section=${section}&id=${scheduleButton.id}`, updatedButton);
       }
       
       const successMessage = mqttSuccess 
@@ -349,21 +358,6 @@ export default function ScheduleDisplay({
   return (
     <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
       <h4 className="text-md font-semibold text-main-color mb-3">Schedule Settings</h4>
-
-      {/* MQTT Status */}
-      {/* {mqttCredentials ? (
-        <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
-          <div className="text-sm text-green-700">
-            <strong>MQTT Connected:</strong> Using trolley section credentials
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-          <div className="text-sm text-yellow-700">
-            <strong>MQTT Not Configured:</strong> No car section MQTT credentials found
-          </div>
-        </div>
-      )} */}
 
       {/* Days */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -502,9 +496,6 @@ export default function ScheduleDisplay({
             {schedule.hour && !isValidHour(schedule.hour) && (
               <span className="text-red-500">Please enter a valid hour (0-23)</span>
             )}
-            {schedule.hour && isValidHour(schedule.hour) && (
-              <span>Will be sent as: {String(parseInt(schedule.hour)).padStart(2, "0")}:{displayMinute}</span>
-            )}
           </div>
         </div>
       </div>
@@ -514,12 +505,13 @@ export default function ScheduleDisplay({
           Current:{" "}
           <span className="font-medium">
             {schedule.days.includes("Nun") 
-              ? "Nun (All zeros)" 
+              ? "Nun " 
               : schedule.days.length 
                 ? schedule.days.join(", ") 
                 : "—"} @ {displayHour || "__"}:
             {displayMinute}
           </span>
+          <br />
         </div>
         <Button 
           onClick={handleSaveAndSendSchedule} 
