@@ -32,6 +32,41 @@ export default function UserLogsTab({ sectionName }) {
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
+  // Function to convert Egypt time to Jordan time
+  const convertToJordanTime = (date, time) => {
+    if (!date || !time) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      // Create date object assuming the input is in Egypt time (Africa/Cairo)
+      const egyptTime = new Date(`${date}T${time}`);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(egyptTime);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting time:', err);
+      return { date, time }; // Return original if conversion fails
+    }
+  };
+
   useEffect(() => {
     if (!deviceId) {
       setError("Cannot determine device ID from URL");
@@ -130,14 +165,16 @@ export default function UserLogsTab({ sectionName }) {
     const csvContent = [
       cyclesRow.join(","),
       headers.join(","),
-      ...filteredLogs.map((log) =>
-        [
-          `"'${log.date || ""}'"`,
-          `"'${log.time || ""}'"`,
+      ...filteredLogs.map((log) => {
+        // Convert to Jordan time for download
+        const jordanTime = convertToJordanTime(log.date, log.time);
+        return [
+          `"'${jordanTime.date || ""}'"`,
+          `"'${jordanTime.time || ""}'"`,
           `"${(log.message || "").replace(/"/g, '""')}"`,
           `"${log.topic_main || ""}"`,
-        ].join(",")
-      ),
+        ].join(",");
+      }),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -221,7 +258,7 @@ export default function UserLogsTab({ sectionName }) {
               Section Cycles: <span className="font-bold">{sectionCycles !== null ? sectionCycles : "N/A"}</span>
             </p>
             <p className="text-xs text-blue-600 mt-1">
-              Showing last 10 logs only • Read-only access • Auto-refresh every 5 seconds
+              Showing last 10 logs only • Read-only access • Auto-refresh every 5 seconds • Times in Jordan Time
             </p>
           </div>
           <FileText className="w-6 h-6 text-blue-500" />
@@ -231,28 +268,32 @@ export default function UserLogsTab({ sectionName }) {
       {/* Logs List */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {filteredLogs.length > 0 ? (
-          filteredLogs.map((log, index) => (
-            <div
-              key={index}
-              className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors duration-200"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 bg-main-color rounded-full mt-2 flex-shrink-0"></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-800 font-medium">
-                    {log.message || "No message"}
-                  </p>
-                  <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
-                    <span>Date: {log.date || "Unknown"}</span>
-                    <span>Time: {log.time || "Unknown"}</span>
-                    {log.topic_main && (
-                      <span>Topic: {log.topic_main}</span>
-                    )}
+          filteredLogs.map((log, index) => {
+            // Convert each log's time to Jordan time
+            const jordanTime = convertToJordanTime(log.date, log.time);
+            return (
+              <div
+                key={index}
+                className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors duration-200"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-main-color rounded-full mt-2 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-800 font-medium">
+                      {log.message || "No message"}
+                    </p>
+                    <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                      <span>Date: {jordanTime.date || "Unknown"}</span>
+                      <span>Time: {jordanTime.time || "Unknown"}</span>
+                      {log.topic_main && (
+                        <span>Topic: {log.topic_main}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="text-center py-8">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -272,7 +313,7 @@ export default function UserLogsTab({ sectionName }) {
               Displaying {logs.length} logs • Section Cycles: {sectionCycles !== null ? sectionCycles : "N/A"}
             </span>
             <span className="text-xs bg-main-color text-white px-2 py-1 rounded">
-              Read Only
+              UTC+3
             </span>
           </div>
         </div>

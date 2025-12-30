@@ -58,6 +58,75 @@ export default function NotificationCenter({
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
+  // Function to convert Egypt time to Jordan time
+  const convertToJordanTime = (date, time) => {
+    if (!date || !time) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      // Create date object assuming the input is in Egypt time (Africa/Cairo)
+      const egyptTime = new Date(`${date}T${time}`);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(egyptTime);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting time:', err);
+      return { date, time }; // Return original if conversion fails
+    }
+  };
+
+  // Function to convert timestamp to Jordan time
+  const convertTimestampToJordanTime = (timestamp) => {
+    if (!timestamp) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      const date = new Date(timestamp);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(date);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting timestamp:', err);
+      return { date: "Unknown", time: "Unknown" };
+    }
+  };
+
   useEffect(() => {
     const fetchAndMergeNotifications = async () => {
       try {
@@ -69,10 +138,31 @@ export default function NotificationCenter({
         
         let serverNotifications = Array.isArray(serverRes.data) ? serverRes.data : [];
         
+        // Convert server notifications to Jordan time
+        serverNotifications = serverNotifications.map(note => {
+          const jordanTime = convertToJordanTime(note.date, note.time);
+          return {
+            ...note,
+            jordanDate: jordanTime.date,
+            jordanTime: jordanTime.time
+          };
+        });
+        
         const enhancedServerNotifications = enhanceNotificationsWithRobotInfo(serverNotifications);
         
+        // Convert MQTT notifications to Jordan time
+        const mqttNotificationsJordan = mqttNotifications.map(note => {
+          const jordanTime = note.timestamp ? convertTimestampToJordanTime(note.timestamp) : convertToJordanTime(note.date, note.time);
+          return {
+            ...note,
+            jordanDate: jordanTime.date,
+            jordanTime: jordanTime.time,
+            isMqtt: true
+          };
+        });
+        
         const allNotifications = [
-          ...mqttNotifications,
+          ...mqttNotificationsJordan,
           ...enhancedServerNotifications
         ];
         
@@ -95,7 +185,17 @@ export default function NotificationCenter({
         console.error("Error fetching notifications:", err);
         setError("Failed to load notifications: " + (err.message || "Unknown error"));
         
-        const sortedMqtt = [...mqttNotifications].sort((a, b) => {
+        const mqttNotificationsJordan = mqttNotifications.map(note => {
+          const jordanTime = note.timestamp ? convertTimestampToJordanTime(note.timestamp) : convertToJordanTime(note.date, note.time);
+          return {
+            ...note,
+            jordanDate: jordanTime.date,
+            jordanTime: jordanTime.time,
+            isMqtt: true
+          };
+        });
+        
+        const sortedMqtt = [...mqttNotificationsJordan].sort((a, b) => {
           try {
             return (b.timestamp || 0) - (a.timestamp || 0);
           } catch {
@@ -337,7 +437,7 @@ export default function NotificationCenter({
         robotName: robotName || "Unknown Robot",
         sectionName: sectionName,
         projectName: projectName || "All Projects",
-        displayMessage: actualMessage 
+        displayMessage: actualMessage
       };
     });
   };
@@ -358,6 +458,16 @@ export default function NotificationCenter({
       
       let allNotifications = Array.isArray(res.data) ? res.data : [];
 
+      // Convert to Jordan time
+      allNotifications = allNotifications.map(note => {
+        const jordanTime = convertToJordanTime(note.date, note.time);
+        return {
+          ...note,
+          jordanDate: jordanTime.date,
+          jordanTime: jordanTime.time
+        };
+      });
+
       const sortedNotifications = allNotifications.sort((a, b) => {
         try {
           const dateA = new Date(`${a.date}T${a.time}`);
@@ -370,8 +480,19 @@ export default function NotificationCenter({
 
       const enhancedNotifications = enhanceNotificationsWithRobotInfo(sortedNotifications);
       
+      // Convert MQTT notifications to Jordan time
+      const mqttNotificationsJordan = mqttNotifications.map(note => {
+        const jordanTime = note.timestamp ? convertTimestampToJordanTime(note.timestamp) : convertToJordanTime(note.date, note.time);
+        return {
+          ...note,
+          jordanDate: jordanTime.date,
+          jordanTime: jordanTime.time,
+          isMqtt: true
+        };
+      });
+      
       const mergedNotifications = [
-        ...mqttNotifications,
+        ...mqttNotificationsJordan,
         ...enhancedNotifications
       ];
       
@@ -634,7 +755,7 @@ export default function NotificationCenter({
                 <Bell className="w-8 h-8 text-main-color" />
                 <div>
                   <h1 className="text-2xl font-bold text-gray-800">Notifications Dashboard</h1>
-                  <p className="text-gray-600">Real-time & historical notifications</p>
+                  <p className="text-gray-600">Real-time & historical notifications • Times in Jordan Time</p>
                 </div>
               </div>
             </div>
@@ -857,6 +978,9 @@ export default function NotificationCenter({
                     <Badge variant="secondary" className="text-sm bg-main-color text-white">
                       Sorted by: Newest First
                     </Badge>
+                    <Badge variant="outline" className="text-sm border-green-500 text-green-600">
+                      UTC+3
+                    </Badge>
                     {activeTab === "realtime" && (
                       <Badge variant="outline" className="text-sm border-green-500 text-green-600">
                         <Wifi className="w-3 h-3 mr-1" />
@@ -920,7 +1044,7 @@ export default function NotificationCenter({
                                 isAlert ? "text-red-600" : "text-blue-600"
                               }`}
                             >
-                              {note.date} • {note.time}
+                              {note.jordanDate} • {note.jordanTime}
                               {isRealtime && (
                                 <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
                                   Just now
@@ -1028,6 +1152,9 @@ export default function NotificationCenter({
                 {activeConnections.length > 0 
                   ? `${connectedCount}/${connectionCount} connected` 
                   : 'All Projects'}
+              </p>
+              <p className="text-xs text-white/60">
+                Times in Jordan Time
               </p>
             </div>
           </div>
@@ -1195,7 +1322,7 @@ export default function NotificationCenter({
                 Showing {filteredNotifications.length} of {notifications.length} notifications
               </p>
               <Badge variant="secondary" className="text-xs bg-main-color text-white">
-                Newest First
+                UTC+3
               </Badge>
             </div>
 
@@ -1253,7 +1380,7 @@ export default function NotificationCenter({
                             isAlert ? "text-red-600" : "text-blue-600"
                           }`}
                         >
-                          {note.date} • {note.time}
+                          {note.jordanDate} • {note.jordanTime}
                           {isRealtime && (
                             <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded">
                               now

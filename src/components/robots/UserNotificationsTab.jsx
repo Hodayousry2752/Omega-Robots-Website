@@ -12,6 +12,41 @@ export default function UserNotificationsTab({ robotId, sectionName }) {
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
+  // Function to convert Egypt time to Jordan time
+  const convertToJordanTime = (date, time) => {
+    if (!date || !time) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      // Create date object assuming the input is in Egypt time (Africa/Cairo)
+      const egyptTime = new Date(`${date}T${time}`);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(egyptTime);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting time:', err);
+      return { date, time }; // Return original if conversion fails
+    }
+  };
+
   const getDisplaySectionName = (section) => {
     if (section === "main") return "Robot";
     if (section === "car") return "Trolley";
@@ -128,6 +163,9 @@ export default function UserNotificationsTab({ robotId, sectionName }) {
             <p className="text-sm text-blue-700 font-medium">
               Total Notifications: <span className="font-bold">{filteredNotes.length}</span>
             </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Times displayed in Jordan Time
+            </p>
           </div>
           <Bell className="w-6 h-6 text-blue-500" />
         </div>
@@ -137,6 +175,8 @@ export default function UserNotificationsTab({ robotId, sectionName }) {
       <div className="space-y-4">
         {filteredNotes.length > 0 ? (
           filteredNotes.map((note, index) => {
+            // Convert each note's time to Jordan time
+            const jordanTime = convertToJordanTime(note.date, note.time);
             const isAlert = isAlertNotification(note);
             const backgroundColor = isAlert ? 'bg-red-50' : 'bg-blue-50';
             const borderColor = isAlert ? 'border-red-200' : 'border-blue-200';
@@ -160,8 +200,8 @@ export default function UserNotificationsTab({ robotId, sectionName }) {
                 
                 <CardContent className="pt-0">
                   <div className="flex justify-between items-center text-sm text-gray-600">
-                    <span>Date: {note.date || "Unknown"}</span>
-                    <span>Time: {note.time || "Unknown"}</span>
+                    <span>Date: {jordanTime.date || "Unknown"}</span>
+                    <span>Time: {jordanTime.time || "Unknown"}</span>
                   </div>
                   {/* {note.topic_main && (
                     <p className="text-xs text-gray-500 mt-2">

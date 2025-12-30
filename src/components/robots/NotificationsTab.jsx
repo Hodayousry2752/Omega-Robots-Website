@@ -14,6 +14,32 @@ export default function NotificationsTab({ robotId, sectionName }) {
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
+  // Helper function to convert Egypt time to Jordan time
+  const convertToJordanTime = (dateStr, timeStr) => {
+    if (!dateStr || !timeStr) return { date: dateStr, time: timeStr };
+    
+    try {
+      // Parse as Egypt time (UTC+2)
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+      
+      // Create date in Egypt time (assuming Egypt is UTC+2)
+      const egyptTime = new Date(Date.UTC(year, month - 1, day, hours - 2, minutes, seconds || 0));
+      
+      // Convert to Jordan time (UTC+3) by adding 1 hour
+      const jordanTime = new Date(egyptTime.getTime() + (60 * 60 * 1000));
+      
+      // Format back to strings
+      const jordanDate = jordanTime.toISOString().split('T')[0];
+      const jordanTimeStr = jordanTime.toISOString().split('T')[1].substring(0, 8);
+      
+      return { date: jordanDate, time: jordanTimeStr };
+    } catch (error) {
+      console.error("Error converting time:", error);
+      return { date: dateStr, time: timeStr };
+    }
+  };
+
   useEffect(() => {
     if (!robotId) {
       setError("Cannot determine robot ID");
@@ -201,6 +227,7 @@ console.log(filtered)
             const backgroundColor = isAlert ? 'bg-red-50' : 'bg-blue-50';
             const borderColor = isAlert ? 'border-red-200' : 'border-blue-200';
             const iconColor = isAlert ? 'text-red-500' : 'text-main-color';
+            const { date, time } = convertToJordanTime(note.date, note.time);
 
             return (
               <Card
@@ -235,7 +262,7 @@ console.log(filtered)
 
                 <CardContent>
                   <p className={`text-sm ${isAlert ? 'text-red-600' : 'text-gray-600'}`}>
-                    Date: {note.date} | Time: {note.time}
+                    Date: {date} | Time: {time} (UTC+3)
                   </p>
                   {isAlert && (
                     <div className="flex items-center gap-1 mt-1">

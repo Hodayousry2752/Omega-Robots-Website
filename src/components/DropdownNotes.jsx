@@ -62,6 +62,75 @@ export default function NotificationCenter({
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
+  // Function to convert Egypt time to Jordan time
+  const convertToJordanTime = (date, time) => {
+    if (!date || !time) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      // Create date object assuming the input is in Egypt time (Africa/Cairo)
+      const egyptTime = new Date(`${date}T${time}`);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(egyptTime);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting time:', err);
+      return { date, time }; // Return original if conversion fails
+    }
+  };
+
+  // Function to convert timestamp to Jordan time
+  const convertTimestampToJordanTime = (timestamp) => {
+    if (!timestamp) return { date: "Unknown", time: "Unknown" };
+    
+    try {
+      const date = new Date(timestamp);
+      
+      // Convert to Jordan time (Asia/Amman)
+      const options = {
+        timeZone: 'Asia/Amman',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(date);
+      
+      const getPart = (type) => parts.find(part => part.type === type)?.value;
+      
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
+      };
+    } catch (err) {
+      console.error('Error converting timestamp:', err);
+      return { date: "Unknown", time: "Unknown" };
+    }
+  };
+
   const fetchAllUsers = async () => {
     try {
       const response = await axios.get(`${API_BASE}/users`);
@@ -97,6 +166,9 @@ export default function NotificationCenter({
       }
 
       const { robotName, sectionName } = getRobotAndSectionInfo(notification);
+      
+      // Convert notification time to Jordan time for email
+      const jordanTime = convertToJordanTime(notification.date, notification.time);
 
       const emailData = {
         subject: `🚨 Alert Notification - ${projectName}`,
@@ -119,6 +191,7 @@ export default function NotificationCenter({
             <div class="container">
               <div class="header">
                 <h2>🚨 Alert Notification</h2>
+                <p><em>Times displayed in Jordan Time</em></p>
               </div>
               <div class="content">
                 <h3>Project: ${projectName}</h3>
@@ -126,8 +199,8 @@ export default function NotificationCenter({
                   <div class="detail-item"><strong>Alert Message:</strong> ${notification.message}</div>
                   <div class="detail-item"><strong>Robot:</strong> ${robotName}</div>
                   <div class="detail-item"><strong>Section:</strong> ${sectionName}</div>
-                  <div class="detail-item"><strong>Date:</strong> ${notification.date}</div>
-                  <div class="detail-item"><strong>Time:</strong> ${notification.time}</div>
+                  <div class="detail-item"><strong>Date:</strong> ${jordanTime.date}</div>
+                  <div class="detail-item"><strong>Time:</strong> ${jordanTime.time} (Jordan Time)</div>
                   ${notification.topic_main ? `<div class="detail-item"><strong>Topic:</strong> ${notification.topic_main}</div>` : ''}
                   <div class="detail-item priority">Priority: High - Immediate Attention Required</div>
                 </div>
@@ -519,7 +592,18 @@ export default function NotificationCenter({
         headers: { "Content-Type": "application/json" },
       });
       
-      const allNotifications = Array.isArray(res.data) ? res.data : [];
+      let allNotifications = Array.isArray(res.data) ? res.data : [];
+      
+      // Convert notifications to Jordan time
+      allNotifications = allNotifications.map(note => {
+        const jordanTime = convertToJordanTime(note.date, note.time);
+        return {
+          ...note,
+          jordanDate: jordanTime.date,
+          jordanTime: jordanTime.time
+        };
+      });
+      
       console.log("Fetched notifications:", allNotifications);
 
       const sortedNotifications = allNotifications.sort((a, b) => {
@@ -680,7 +764,7 @@ export default function NotificationCenter({
                 <Bell className={`w-8 h-8 text-main-color ${getBellBlinkClass()}`} />
                 <div>
                   <h1 className="text-2xl font-bold text-gray-800">Notifications Dashboard</h1>
-                  <p className="text-gray-600">Project: {getProjectDisplayName()}</p>
+                  <p className="text-gray-600">Project: {getProjectDisplayName()} • Times in Jordan Time</p>
                 </div>
               </div>
             </div>
@@ -848,9 +932,14 @@ export default function NotificationCenter({
                     Showing {filteredNotifications.length} of {notifications.filter(note => !currentProject || isNotificationInCurrentProject(note)).length} notifications
                     {currentProject && ` for ${currentProject.ProjectName}`}
                   </p>
-                  <Badge variant="secondary" className="text-sm">
-                    Sorted by: Newest First
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-sm">
+                      Sorted by: Newest First
+                    </Badge>
+                    <Badge variant="secondary" className="text-sm bg-green-500 text-white">
+                      UTC+3
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -890,7 +979,7 @@ export default function NotificationCenter({
                                 isAlert ? "text-red-600" : "text-blue-600"
                               }`}
                             >
-                              {note.date} • {note.time}
+                              {note.jordanDate} • {note.jordanTime}
                             </p>
 
                             {note.topic_main && (
@@ -988,6 +1077,9 @@ export default function NotificationCenter({
               <h3 className="text-lg font-semibold">Notifications</h3>
               <p className="text-sm text-white/80">
                 Project: {getProjectDisplayName()}
+              </p>
+              <p className="text-xs text-white/60">
+                Times in Jordan Time
               </p>
             </div>
           </div>
@@ -1108,7 +1200,7 @@ export default function NotificationCenter({
           <div className="p-3">
             <div className="mb-3 flex justify-between items-center">
               <Badge variant="secondary" className="text-xs">
-                Newest First
+                UTC+3
               </Badge>
             </div>
 
@@ -1149,7 +1241,7 @@ export default function NotificationCenter({
                             isAlert ? "text-red-600" : "text-blue-600"
                           }`}
                         >
-                          {note.date} • {note.time}
+                          {note.jordanDate} • {note.jordanTime}
                         </p>
 
                         {/* {note.topic_main && (

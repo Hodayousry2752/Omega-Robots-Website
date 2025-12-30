@@ -29,7 +29,7 @@ export default function AddUser() {
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
-  const ACCESS_PASSWORD = "#aoxns@343."; 
+  const ACCESS_PASSWORD = "Robot@2022"; 
 
   // Fetch user data if editing
   useEffect(() => {

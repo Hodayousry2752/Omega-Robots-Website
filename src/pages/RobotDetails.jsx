@@ -840,7 +840,7 @@ export default function RobotDetails() {
 
         {mainSection.ActiveBtns && mainSection.ActiveBtns.length > 0 && (
           <div className="mb-8">
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 justify-items-center">
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-6 ">
               {getActiveButtons(mainSection, "main")}
             </div>
           </div>
@@ -898,10 +898,10 @@ export default function RobotDetails() {
         </div>
 
         {carSection.ActiveBtns && carSection.ActiveBtns.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 justify-items-center">
-            {getActiveButtons(carSection, "car")}
-          </div>
-        )}
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
+          {getActiveButtons(carSection, "car")}
+        </div>
+      )}
       </motion.div>
     );
   };
