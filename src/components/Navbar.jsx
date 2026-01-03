@@ -95,15 +95,13 @@ export default function Navbar() {
       const hasNew = projectNotifications.some(note => isNewNotification(note));
       setHasNewNotifications(hasNew);
       
-      console.log("Notifications loaded:", projectNotifications.length);
-      console.log("Has new notifications:", hasNew);
+      
       
       if (hasNew && !lastOpenedTime) {
         startBlinking();
       }
       
     } catch (err) {
-      console.error("Failed to load notifications:", err);
     } finally {
       setLoading(false);
     }

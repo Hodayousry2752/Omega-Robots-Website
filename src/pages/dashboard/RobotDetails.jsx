@@ -35,10 +35,11 @@ export default function RobotDetailsFull() {
       const data = await getData(`${BASE_URL}/robots.php/${id}`);
       setRobot(data || {});
       
-      console.log("🔍 API Response:", data);
-      
+      // Load schedule from robot data if available
+      if (data?.schedule) {
+        setSchedule(data.schedule);
+      }
     } catch (err) {
-      console.error("❌ Error fetching robot:", err);
     }
   };
 
@@ -85,7 +86,6 @@ export default function RobotDetailsFull() {
       return;
     }
 
-    console.log("🤖 Publishing to ROBOT via contextMqtt:", { topic, message: btnName });
     
     const success = publishMessage(id, "main", topic, btnName);
     if (success) {
@@ -109,7 +109,6 @@ export default function RobotDetailsFull() {
       return;
     }
 
-    console.log("🚗 Publishing to TROLLEY via contextMqtt:", { topic, message: btnName });
     
     const success = publishMessage(id, "car", topic, btnName);
     if (success) {
@@ -144,6 +143,12 @@ export default function RobotDetailsFull() {
   const showTrolley = robot?.isTrolley == 1 || robot?.isTrolley === "true" || robot?.isTrolley === true;
   const hasRobotMqtt = robot.Sections?.main?.mqttUrl;
   const hasTrolleyMqtt = robot.Sections?.car?.mqttUrl;
+
+  // Determine which section to use for schedule
+  const scheduleSection = showTrolley && hasTrolleyMqtt ? "car" : "main";
+  const scheduleMqttUrl = showTrolley && hasTrolleyMqtt 
+    ? robot.Sections.car.mqttUrl 
+    : robot.Sections.main.mqttUrl;
 
   return (
     <motion.div
@@ -266,8 +271,10 @@ export default function RobotDetailsFull() {
           </section>
         )}
 
-        {/* SCHEDULE SETTINGS SECTION */}
-        {showTrolley && (
+        {/* SCHEDULE SETTINGS SECTION - Different positioning based on trolley */}
+        
+        {/* For trolley robots: schedule appears between trolley and robot sections */}
+        {showTrolley && hasTrolleyMqtt && (
           <section className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
@@ -277,6 +284,11 @@ export default function RobotDetailsFull() {
                 <p className="text-sm text-gray-500 mt-1">
                   Configure robot and trolley schedule
                 </p>
+                {scheduleMqttUrl && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Using Trolley MQTT Broker: {scheduleMqttUrl}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -284,7 +296,8 @@ export default function RobotDetailsFull() {
               schedule={schedule}
               setSchedule={handleScheduleUpdate}
               projectId={robot.projectId}
-              topic={robot.Sections?.car?.Topic_main}
+              section={scheduleSection}
+              robotData={robot}
             />
           </section>
         )}
@@ -342,6 +355,35 @@ export default function RobotDetailsFull() {
                 />
               )}
             </div>
+          </section>
+        )}
+
+        {/* For non-trolley robots: schedule appears AFTER robot section */}
+        {!showTrolley && hasRobotMqtt && (
+          <section className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-main-color">
+                  Schedule Settings
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Configure robot schedule
+                </p>
+                {scheduleMqttUrl && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Using Robot MQTT Broker: {scheduleMqttUrl}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <ScheduleSettings
+              schedule={schedule}
+              setSchedule={handleScheduleUpdate}
+              projectId={robot.projectId}
+              section={scheduleSection}
+              robotData={robot}
+            />
           </section>
         )}
 

@@ -61,7 +61,6 @@ export default function AddUser() {
         const projectsData = await getData(`${BASE_URL}/projects.php`);
         setProjects(projectsData || []);
       } catch (error) {
-        console.error("Failed to fetch projects:", error);
         toast.error("Failed to load projects");
         setProjects([]);
       } finally {

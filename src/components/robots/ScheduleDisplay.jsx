@@ -70,7 +70,6 @@ export default function ScheduleDisplay({
         const data = await getData(`${BASE_URL}/robots/${robotId}`);
         setRobotData(data);
       } catch (err) {
-        console.error('Error fetching robot data:', err);
       } finally {
         setRobotLoading(false);
       }
@@ -103,7 +102,6 @@ export default function ScheduleDisplay({
       const stored = localStorage.getItem(getScheduleVisibilityKey());
       return stored ? JSON.parse(stored) : true;
     } catch (error) {
-      console.error("Error loading schedule visibility:", error);
       return true;
     }
   };
@@ -131,7 +129,6 @@ export default function ScheduleDisplay({
       // format: schedule_HH_MM_Sun_Mon_Tue_Wed_Thu_Fri_Sat
       // parts length should be 10: schedule + hour + minute + 7 days
       if (parts.length < 10 || parts[0] !== 'schedule') {
-        console.warn('Invalid schedule format:', btnName);
         return null;
       }
       
@@ -142,7 +139,6 @@ export default function ScheduleDisplay({
         rawData: btnName
       };
     } catch (error) {
-      console.error('Error parsing schedule:', error);
       return null;
     }
   };
@@ -289,9 +285,7 @@ export default function ScheduleDisplay({
           );
           
           mqttSuccess = true;
-          console.log(`Schedule sent via MQTT: ${message} to topic: ${mqttCredentials.topic}`);
         } catch (mqttError) {
-          console.error("MQTT publish failed:", mqttError);
         }
       }
 
@@ -325,7 +319,6 @@ export default function ScheduleDisplay({
       toast.success(successMessage);
       
     } catch (err) {
-      console.error("Failed to set schedule:", err);
       toast.error("Failed to set schedule");
     } finally {
       setSaving(false);

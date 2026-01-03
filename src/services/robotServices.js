@@ -64,7 +64,6 @@ export async function getRobot(robotId) {
     }
     return await response.json();
   } catch (err) {
-    console.error("Error fetching robot:", err);
     throw err;
   }
 }

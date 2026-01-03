@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { postData } from "@/services/postServices";
 import RobotMainPanel from "@/components/robots/RobotMainPanel";
 import RobotTrolleyPanel from "@/components/robots/RobotTrolleyPanel";
+import imageCompression from "browser-image-compression";
 import RobotImg from "../../assets/Robot1.jpg";
 
 export default function AddRobotWithTrolley() {
@@ -50,31 +51,52 @@ export default function AddRobotWithTrolley() {
     },
   });
 
-  /*
-  const [isMainUnlocked, setIsMainUnlocked] = useState(false);
-  const [mainPassword, setMainPassword] = useState("");
+  // Function to compress image
+  const compressImage = async (imageFile) => {
+    try {
+      
+      const options = {
+        maxSizeMB: 1, // Maximum size in MB
+        maxWidthOrHeight: 1920, // Maximum width or height
+        useWebWorker: true, // Use web worker for faster compression
+        fileType: 'image/jpeg', // Force JPEG format
+        initialQuality: 0.8, // Quality between 0 and 1
+      };
 
-  const MAIN_PASSWORD = "Robot@2022";
-
-  const handlePasswordSubmit = () => {
-    if (mainPassword === MAIN_PASSWORD) {
-      setIsMainUnlocked(true);
-      toast.success("Robot section has been successfully opened.");
-      setMainPassword("");
-    } else {
-      toast.error("Incorrect password");
-      setMainPassword("");
+      const compressedFile = await imageCompression(imageFile, options);
+      
+      
+      // If still too large, compress further
+      if (compressedFile.size > 1024 * 1024) {
+        const furtherOptions = {
+          ...options,
+          maxSizeMB: 0.5,
+          initialQuality: 0.6,
+        };
+        const furtherCompressed = await imageCompression(imageFile, furtherOptions);
+        return furtherCompressed;
+      }
+      
+      return compressedFile;
+    } catch (error) {
+      toast.error('Failed to compress image. Using original.');
+      return imageFile;
     }
   };
-  */
 
   const convertImageUrlToFile = async (imageUrl, fileName) => {
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      return new File([blob], fileName, { type: blob.type });
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      // Compress default image if it's large
+      if (blob.size > 1024 * 1024) {
+        return await compressImage(file);
+      }
+      
+      return file;
     } catch (error) {
-      console.error("Error converting image to file:", error);
       return null;
     }
   };
@@ -113,16 +135,22 @@ export default function AddRobotWithTrolley() {
       fd.append("Sections", JSON.stringify(sectionsToSend));
 
       if (robot.Image) {
-        fd.append("Image", robot.Image);
+        // Final compression check before upload
+        let finalImage = robot.Image;
+        if (robot.Image.size > 1024 * 1024) {
+          toast.info('Compressing image for upload...');
+          finalImage = await compressImage(robot.Image);
+        }
+        fd.append("Image", finalImage);
+        
+        
       } else {
         try {
           const defaultImageFile = await convertImageUrlToFile(RobotImg, "Robot1.jpg");
           if (defaultImageFile) {
             fd.append("Image", defaultImageFile);
-            console.log("✅ Default image added to robot");
           }
         } catch (error) {
-          console.error("Failed to add default image:", error);
         }
       }
 
@@ -139,7 +167,6 @@ export default function AddRobotWithTrolley() {
         toast.error(data.message || "Failed to save robot.");
       }
     } catch (err) {
-      console.error("Save error:", err);
       toast.error("Failed to save robot.");
     } finally {
       setLoading(false);
@@ -184,12 +211,42 @@ export default function AddRobotWithTrolley() {
     setRobot((prev) => ({ ...prev, RobotName: name }));
   };
 
-  const updateImage = (file, preview) => {
-    setRobot((prev) => ({
-      ...prev,
-      Image: file,
-      imagePreview: preview,
-    }));
+  const updateImage = async (file, preview) => {
+    // If file is too large (> 1MB), compress it
+    if (file && file.size > 1024 * 1024) {
+      try {
+        toast.loading('Compressing image...');
+        
+        const compressedFile = await compressImage(file);
+        
+        // Create preview from compressed file
+        const compressedPreview = URL.createObjectURL(compressedFile);
+        
+        setRobot((prev) => ({
+          ...prev,
+          Image: compressedFile,
+          imagePreview: compressedPreview,
+        }));
+        
+        toast.dismiss();
+        toast.success('Image compressed successfully!');
+      } catch (error) {
+        toast.error('Failed to compress image');
+        // Fallback to original
+        setRobot((prev) => ({
+          ...prev,
+          Image: file,
+          imagePreview: preview,
+        }));
+      }
+    } else {
+      // If file is already small, use as is
+      setRobot((prev) => ({
+        ...prev,
+        Image: file,
+        imagePreview: preview,
+      }));
+    }
   };
 
   return (
@@ -206,16 +263,24 @@ export default function AddRobotWithTrolley() {
             <p className="text-sm text-gray-500 mt-1">
               Project ID: <span className="font-mono">{id || "-"}</span>
             </p>
+            <p className="text-xs text-blue-500 mt-1">
+              ⚡ Images will be automatically compressed to under 1MB
+            </p>
           </div>
           <div className="flex gap-3">
             <Button
               onClick={() => navigate(-1)}
               className="bg-white border text-main-color"
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} className="bg-main-color text-white">
-              Save
+            <Button 
+              onClick={handleSubmit} 
+              className="bg-main-color text-white"
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save"}
             </Button>
           </div>
         </div>
@@ -258,49 +323,6 @@ export default function AddRobotWithTrolley() {
           </div>
 
           <div className="mt-5 space-y-6">
-            {/*
-              !isMainUnlocked ? (
-                // Password Input Section
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-main-color mb-4">
-                    Enter the password to access the robot control{" "}
-                  </h3>
-                  <div className="flex gap-3 items-center">
-                    <input
-                      type="password"
-                      value={mainPassword}
-                      onChange={(e) => setMainPassword(e.target.value)}
-                      placeholder="Enter the password"
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          handlePasswordSubmit();
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handlePasswordSubmit}
-                      className="bg-main-color text-white"
-                    >
-                      open
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // Main Control Section (Unlocked)
-                <RobotMainPanel
-                  mainData={robot.Sections.main}
-                  updateMainSection={updateMainSection}
-                  robotName={robot.RobotName}
-                  updateRobotName={updateRobotName}
-                  imagePreview={robot.imagePreview}
-                  updateImage={updateImage}
-                  fixedFields={true}
-                />
-              )
-            */}
-            
-            {/* Main Control Section */}
             <RobotMainPanel
               mainData={robot.Sections.main}
               updateMainSection={updateMainSection}

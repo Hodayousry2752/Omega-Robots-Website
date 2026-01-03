@@ -97,15 +97,13 @@ export default function DashboardSidebar({ children }) {
       const hasNew = allNotifications.some(note => isNewNotification(note));
       setHasNewNotifications(hasNew);
       
-      console.log("Dashboard notifications loaded:", allNotifications.length);
-      console.log("Dashboard has new notifications:", hasNew);
+      
       
       if (hasNew && !lastOpenedTime) {
         startBlinking();
       }
       
     } catch (err) {
-      console.error("Failed to load notifications:", err);
     } finally {
       setLoading(false);
     }

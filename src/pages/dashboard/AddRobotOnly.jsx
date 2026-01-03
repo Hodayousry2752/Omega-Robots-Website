@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import RobotMainPanel from "@/components/robots/RobotMainPanel";
 import { postData } from "@/services/postServices";
+import imageCompression from "browser-image-compression";
 
 import RobotImg from "../../assets/Robot1.jpg";
 
@@ -36,23 +37,39 @@ export default function AddRobotOnly() {
   });
 
   const [loading, setLoading] = useState(false);
-  // const [isMainUnlocked, setIsMainUnlocked] = useState(false);
-  // const [mainPassword, setMainPassword] = useState("");
 
-  // const MAIN_PASSWORD = "Robot@2022";
+  // Function to compress image
+  const compressImage = async (imageFile) => {
+    try {
+      
+      const options = {
+        maxSizeMB: 1, // Maximum size in MB (less than 1 MB)
+        maxWidthOrHeight: 1920, // Maximum width or height (maintains aspect ratio)
+        useWebWorker: true, // Use web worker for faster compression
+        fileType: 'image/jpeg', // Force JPEG format for better compression
+        initialQuality: 0.8, // Quality between 0 and 1
+      };
 
-  /*
-  const handlePasswordSubmit = () => {
-    if (mainPassword === MAIN_PASSWORD) {
-      setIsMainUnlocked(true);
-      toast.success("Robot section has been successfully opened.");
-      setMainPassword("");
-    } else {
-      toast.error("Incorrect password");
-      setMainPassword("");
+      const compressedFile = await imageCompression(imageFile, options);
+      
+      
+      // If still too large, compress further with lower quality
+      if (compressedFile.size > 1024 * 1024) { // If still > 1MB
+        const furtherOptions = {
+          ...options,
+          maxSizeMB: 0.5, // Target 0.5 MB
+          initialQuality: 0.6,
+        };
+        const furtherCompressed = await imageCompression(imageFile, furtherOptions);
+        return furtherCompressed;
+      }
+      
+      return compressedFile;
+    } catch (error) {
+      toast.error('Failed to compress image. Using original.');
+      return imageFile; // Fallback to original image
     }
   };
-  */
 
   const updateMainSection = (updates) => {
     const { Voltage, Cycles, Status, ...allowedUpdates } = updates;
@@ -75,21 +92,60 @@ export default function AddRobotOnly() {
     setRobot((prev) => ({ ...prev, RobotName: name }));
   };
 
-  const updateImage = (file, preview) => {
-    setRobot((prev) => ({
-      ...prev,
-      Image: file,
-      imagePreview: preview,
-    }));
+  const updateImage = async (file, preview) => {
+    // If file is too large (> 1MB), compress it
+    if (file && file.size > 1024 * 1024) {
+      try {
+        setLoading(true);
+        toast.loading('Compressing image...');
+        
+        const compressedFile = await compressImage(file);
+        
+        // Create preview from compressed file
+        const compressedPreview = URL.createObjectURL(compressedFile);
+        
+        setRobot((prev) => ({
+          ...prev,
+          Image: compressedFile,
+          imagePreview: compressedPreview,
+        }));
+        
+        toast.dismiss();
+        toast.success('Image compressed successfully!');
+      } catch (error) {
+        toast.error('Failed to compress image');
+        // Fallback to original
+        setRobot((prev) => ({
+          ...prev,
+          Image: file,
+          imagePreview: preview,
+        }));
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // If file is already small, use as is
+      setRobot((prev) => ({
+        ...prev,
+        Image: file,
+        imagePreview: preview,
+      }));
+    }
   };
 
   const convertImageUrlToFile = async (imageUrl, fileName) => {
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      return new File([blob], fileName, { type: blob.type });
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      // Compress default image if it's large
+      if (blob.size > 1024 * 1024) {
+        return await compressImage(file);
+      }
+      
+      return file;
     } catch (error) {
-      console.error("Error converting image to file:", error);
       return null;
     }
   };
@@ -121,16 +177,22 @@ export default function AddRobotOnly() {
       fd.append("Sections", JSON.stringify(sectionsToSend));
 
       if (robot.Image) {
-        fd.append("Image", robot.Image);
+        // Final check: if image is still too large, compress one more time
+        let finalImage = robot.Image;
+        if (robot.Image.size > 1024 * 1024) {
+          toast.info('Final compression...');
+          finalImage = await compressImage(robot.Image);
+        }
+        fd.append("Image", finalImage);
+        
+       
       } else {
         try {
           const defaultImageFile = await convertImageUrlToFile(RobotImg, "Robot1.jpg");
           if (defaultImageFile) {
             fd.append("Image", defaultImageFile);
-            console.log("✅ Default image added to robot");
           }
         } catch (error) {
-          console.error("Failed to add default image:", error);
         }
       }
 
@@ -148,7 +210,6 @@ export default function AddRobotOnly() {
         toast.error(data.message || "Something went wrong!");
       }
     } catch (err) {
-      console.error("❌ Error saving robot:", err);
       toast.error("Failed to save robot.");
     } finally {
       setLoading(false);
@@ -197,52 +258,13 @@ export default function AddRobotOnly() {
               <p className="text-sm text-gray-500 mt-1">
                 Robot settings, controls & logs
               </p>
+              <p className="text-xs text-blue-500 mt-1">
+                ⚡ Images will be automatically compressed to under 1MB
+              </p>
             </div>
           </div>
 
           <div className="mt-5 space-y-6">
-            {/*
-              !isMainUnlocked ? (
-                // Password Input Section
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-main-color mb-4">
-                    Enter the password to access the robot control{" "}
-                  </h3>
-                  <div className="flex gap-3 items-center">
-                    <input
-                      type="password"
-                      value={mainPassword}
-                      onChange={(e) => setMainPassword(e.target.value)}
-                      placeholder="Enter the password"
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-main-color"
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          handlePasswordSubmit();
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handlePasswordSubmit}
-                      className="bg-main-color text-white"
-                    >
-                      open
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // Main Control Section (Unlocked)
-                <RobotMainPanel
-                  mainData={robot.Sections.main}
-                  updateMainSection={updateMainSection}
-                  robotName={robot.RobotName}
-                  updateRobotName={updateRobotName}
-                  imagePreview={robot.imagePreview}
-                  updateImage={updateImage}
-                  fixedFields={true}
-                />
-              )
-            */}
-            
             <RobotMainPanel
               mainData={robot.Sections.main}
               updateMainSection={updateMainSection}

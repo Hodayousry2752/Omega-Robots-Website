@@ -232,7 +232,6 @@ export default function UsersDashboard() {
         const response = await getData(`${BASE_URL}/users`);
         setUsers(Array.isArray(response) ? response : response?.data || []);
       } catch (error) {
-        console.error("Error fetching users:", error);
       }
     };
     fetchUsers();
@@ -260,7 +259,6 @@ export default function UsersDashboard() {
       await deleteData(`${BASE_URL}/users/${id}`);
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (error) {
-      console.error("Error deleting user:", error);
     } finally {
       setUserToDelete(null);
     }
@@ -283,7 +281,6 @@ export default function UsersDashboard() {
       await deleteData(`${BASE_URL}/users`);
       setUsers([]);
     } catch (error) {
-      console.error("Error deleting all users:", error);
     } finally {
       setDeleteAll(false);
     }

@@ -42,7 +42,6 @@ export default function UserNotificationsTab({ robotId, sectionName }) {
         time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
       };
     } catch (err) {
-      console.error('Error converting time:', err);
       return { date, time }; // Return original if conversion fails
     }
   };

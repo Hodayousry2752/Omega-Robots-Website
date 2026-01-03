@@ -92,7 +92,6 @@ export default function NotificationCenter({
         time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
       };
     } catch (err) {
-      console.error('Error converting time:', err);
       return { date, time }; // Return original if conversion fails
     }
   };
@@ -126,7 +125,6 @@ export default function NotificationCenter({
         time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
       };
     } catch (err) {
-      console.error('Error converting timestamp:', err);
       return { date: "Unknown", time: "Unknown" };
     }
   };
@@ -134,17 +132,14 @@ export default function NotificationCenter({
   const fetchAllUsers = async () => {
     try {
       const response = await axios.get(`${API_BASE}/users`);
-      console.log("Users fetched:", response.data);
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.error("Failed to fetch users:", error);
       return [];
     }
   };
 
   const sendAlertEmails = async (notification, projectName) => {
     try {
-      console.log("Starting to send alert emails for project:", projectName);
       
       const allUsers = await fetchAllUsers();
       
@@ -153,15 +148,12 @@ export default function NotificationCenter({
         const isSameProject = userProject.trim().toLowerCase() === projectName.trim().toLowerCase();
         const hasEmail = user.Email || user.email;
         
-        console.log(`User: ${user.Username}, Project: ${userProject}, Email: ${hasEmail}, Match: ${isSameProject}`);
         
         return isSameProject && hasEmail;
       });
 
-      console.log(`Found ${projectUsers.length} users for project ${projectName}`, projectUsers);
 
       if (projectUsers.length === 0) {
-        console.log("No users found for this project with valid emails");
         return;
       }
 
@@ -221,14 +213,11 @@ export default function NotificationCenter({
         }))
       };
 
-      console.log("Sending email data:", emailData);
       const emailResponse = await axios.post(`${API_BASE}/send-alert-emails`, emailData);
       
-      console.log(`Alert emails sent to ${projectUsers.length} users successfully`);
       return emailResponse.data;
       
     } catch (error) {
-      console.error("Failed to send alert emails:", error);
     }
   };
 
@@ -288,7 +277,6 @@ export default function NotificationCenter({
     try {
       const currentProjectName = currentProject?.ProjectName;
       if (!currentProjectName) {
-        console.log("No current project found, skipping email alerts");
         return;
       }
 
@@ -300,7 +288,6 @@ export default function NotificationCenter({
       );
 
       if (newAlerts.length > 0) {
-        console.log(`Found ${newAlerts.length} new alerts, sending emails...`, newAlerts);
         
         const latestAlert = newAlerts[0];
         await sendAlertEmails(latestAlert, currentProjectName);
@@ -308,7 +295,6 @@ export default function NotificationCenter({
         setLastProcessedAlertId(latestAlert.notificationId);
       }
     } catch (error) {
-      console.error("Error in alert email processing:", error);
     }
   };
 
@@ -367,7 +353,6 @@ export default function NotificationCenter({
       setProjects(projectsArray);
       return projectsArray;
     } catch (err) {
-      console.error("Failed to fetch projects:", err);
       return [];
     }
   };
@@ -391,9 +376,7 @@ export default function NotificationCenter({
 
   const fetchAllRobots = async () => {
     try {
-      console.log("Fetching robots from API...");
       const res = await axios.get(`${API_BASE}/robots.php`);
-      console.log("Raw robots API response:", res.data);
       
       let robotsArray = [];
       
@@ -408,7 +391,6 @@ export default function NotificationCenter({
       
       return robotsArray;
     } catch (err) {
-      console.error("Failed to fetch robots:", err);
       return [];
     }
   };
@@ -436,13 +418,11 @@ export default function NotificationCenter({
       // Check both main and car sections
       for (const [sectionName, section] of Object.entries(robot.Sections)) {
         if (section.Topic_main === topicMain) {
-          console.log(`Found robot by topic ${topicMain}:`, robot);
           return robot;
         }
       }
     }
     
-    console.log(`No robot found for topic: ${topicMain}`);
     return null;
   };
 
@@ -468,11 +448,9 @@ export default function NotificationCenter({
     if (robot) {
       // Try multiple possible name fields
       const robotName = robot.RobotName || robot.robotName || robot.name || robot.robot_name || 'Unknown Robot';
-      console.log(`Found robot: ${robotName} for ID: ${robotId}`, robot);
       return robotName;
     }
     
-    console.log(`Robot not found for ID: ${robotId}, available robots:`, robots);
     return "Robot Not Found";
   };
 
@@ -480,7 +458,6 @@ export default function NotificationCenter({
     if (!topic) return "Unknown Section";
     
     const parts = topic.split('/');
-    console.log(`Section topic parts:`, parts);
     
     if (parts.length >= 2) {
       const sectionType = parts[1];
@@ -495,7 +472,6 @@ export default function NotificationCenter({
         sectionName = sectionType.charAt(0).toUpperCase() + sectionType.slice(1);
       }
       
-      console.log(`Section name: ${sectionName}`);
       return sectionName;
     }
     
@@ -506,7 +482,6 @@ export default function NotificationCenter({
     if (!topic) return "Unknown Robot";
     
     const parts = topic.split('/');
-    console.log(`Topic parts:`, parts);
     
     if (parts.length > 0) {
       let robotNameFromTopic = parts[0];
@@ -526,7 +501,6 @@ export default function NotificationCenter({
           .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
           .join(' ');
         
-        console.log(`Extracted robot name from topic: ${robotNameFromTopic}`);
         return robotNameFromTopic || "Unknown Robot";
       }
     }
@@ -540,12 +514,10 @@ export default function NotificationCenter({
     let robotName = "Unknown Robot";
     let sectionName = "Unknown Section";
 
-    console.log("Getting robot info for notification:", note);
 
     // First try: Use RobotId to find robot
     if (note.RobotId) {
       robotName = getRobotNameByRobotId(note.RobotId);
-      console.log(`Robot name from RobotId (${note.RobotId}): ${robotName}`);
     }
 
     // Second try: Use topic_main to find robot
@@ -553,14 +525,12 @@ export default function NotificationCenter({
       const robotFromTopic = findRobotByTopic(note.topic_main);
       if (robotFromTopic) {
         robotName = robotFromTopic.RobotName || robotFromTopic.robotName || robotFromTopic.name || "Unknown Robot";
-        console.log(`Robot name from topic (${note.topic_main}): ${robotName}`);
       }
     }
 
     // Third try: Extract robot name from topic
     if ((!robotName || robotName === "Robot Not Found" || robotName === "Unknown Robot") && note.topic_main) {
       robotName = getRobotNameFromTopic(note.topic_main);
-      console.log(`Robot name extracted from topic: ${robotName}`);
     }
 
     // Get section name
@@ -568,7 +538,6 @@ export default function NotificationCenter({
       sectionName = getSectionNameFromTopic(note.topic_main);
     }
 
-    console.log(`Final result - Robot: ${robotName}, Section: ${sectionName}`);
     return { robotName, sectionName };
   };
 
@@ -579,7 +548,6 @@ export default function NotificationCenter({
       setRobotsLoaded(false);
 
       const projectName = getProjectNameFromCookie();
-      console.log("Current project from cookie:", projectName);
       const project = await fetchProjectByName(projectName);
       setCurrentProject(project);
 
@@ -604,7 +572,6 @@ export default function NotificationCenter({
         };
       });
       
-      console.log("Fetched notifications:", allNotifications);
 
       const sortedNotifications = allNotifications.sort((a, b) => {
         try {
@@ -619,7 +586,6 @@ export default function NotificationCenter({
       setNotifications(sortedNotifications);
       
     } catch (err) {
-      console.error("Error fetching data:", err);
       setError("Failed to load notifications: " + (err.message || "Unknown error"));
       setRobotsLoaded(true);
     } finally {
@@ -628,19 +594,13 @@ export default function NotificationCenter({
   };
 
   const applyFilters = () => {
-    console.log("Applying filters:", { 
-      searchTerm, 
-      filterType, 
-      notificationsCount: notifications.length,
-      currentProject: currentProject?.ProjectName 
-    });
+   
     
     let filtered = [...notifications];
 
     // Filter by current project first
     if (currentProject) {
       filtered = filtered.filter(note => isNotificationInCurrentProject(note));
-      console.log(`Filtered to ${filtered.length} notifications for project ${currentProject.ProjectName}`);
     }
 
     if (searchTerm) {
@@ -659,7 +619,6 @@ export default function NotificationCenter({
       filtered = filtered.filter(note => !isAlertNotification(note));
     }
 
-    console.log("Final filtered results:", filtered.length);
     setFilteredNotifications(filtered);
   };
 
@@ -795,7 +754,6 @@ export default function NotificationCenter({
                 <Button
                   variant={filterType === "all" ? "default" : "outline"}
                   onClick={() => {
-                    console.log("Setting filter to: all");
                     setFilterType("all");
                   }}
                   className="flex items-center gap-2"
@@ -806,7 +764,6 @@ export default function NotificationCenter({
                 <Button
                   variant={filterType === "alerts" ? "default" : "outline"}
                   onClick={() => {
-                    console.log("Setting filter to: alerts");
                     setFilterType("alerts");
                   }}
                   className="flex items-center gap-2 bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
@@ -817,7 +774,6 @@ export default function NotificationCenter({
                 <Button
                   variant={filterType === "notifications" ? "default" : "outline"} 
                   onClick={() => {
-                    console.log("Setting filter to: notifications");
                     setFilterType("notifications");
                   }}
                   className="flex items-center gap-2 bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
@@ -1119,7 +1075,6 @@ export default function NotificationCenter({
             <Button
               variant={filterType === "all" ? "default" : "outline"}
               onClick={() => {
-                console.log("Setting filter to: all");
                 setFilterType("all");
               }}
               className="flex-1 text-xs h-8"
@@ -1129,7 +1084,6 @@ export default function NotificationCenter({
             <Button
               variant={filterType === "alerts" ? "default" : "outline"}
               onClick={() => {
-                console.log("Setting filter to: alerts");
                 setFilterType("alerts");
               }}
               className="flex-1 text-xs h-8 bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
@@ -1140,7 +1094,6 @@ export default function NotificationCenter({
             <Button
               variant={filterType === "notifications" ? "default" : "outline"} 
               onClick={() => {
-                console.log("Setting filter to: notifications");
                 setFilterType("notifications");
               }}
               className="flex-1 text-xs h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"

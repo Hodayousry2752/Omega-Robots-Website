@@ -37,28 +37,23 @@ export function MqttProvider({ children }) {
   useEffect(() => {
     userRoleRef.current = userRole;
     projectNameCookieRef.current = projectNameFromCookie;
-    console.log("🔄 Updated user info in MqttContext:", { userRole, projectNameFromCookie });
   }, [userRole, projectNameFromCookie]);
 
   const fetchInitialData = useCallback(async () => {
     try {
-      console.log("🔄 Fetching initial data from API...");
       
       const robotsRes = await axios.get(`${API_BASE}/robots.php`);
       const robotsArray = Array.isArray(robotsRes.data) ? robotsRes.data : [];
       robotsDataRef.current = robotsArray;
       setRobotsData(robotsArray);
       
-      console.log(`✅ Loaded ${robotsArray.length} robots`);
       
       try {
         const projectsRes = await axios.get(`${API_BASE}/projects.php`);
         const projectsArray = Array.isArray(projectsRes.data) ? projectsRes.data : [];
         setProjectsData(projectsArray);
         projectsDataRef.current = projectsArray;
-        console.log(`✅ Loaded ${projectsArray.length} projects`);
       } catch (projectsError) {
-        console.warn("Could not fetch projects:", projectsError.message);
         setProjectsData([]);
       }
       
@@ -67,15 +62,12 @@ export function MqttProvider({ children }) {
         const usersArray = Array.isArray(usersRes.data) ? usersRes.data : [];
         setUsersData(usersArray);
         usersDataRef.current = usersArray;
-        console.log(`✅ Loaded ${usersArray.length} users`);
       } catch (usersError) {
-        console.warn("Could not fetch users:", usersError.message);
         setUsersData([]);
       }
       
       return robotsArray;
     } catch (error) {
-      console.error("❌ Failed to fetch initial data:", error);
       return [];
     }
   }, [API_BASE]);
@@ -243,32 +235,22 @@ export function MqttProvider({ children }) {
       const currentUserRole = userRoleRef.current;
       const currentProjectName = projectNameCookieRef.current;
       
-      console.log("🔍 CHECKING USER PROJECT FILTER:", {
-        userRole: currentUserRole,
-        projectNameFromCookie: currentProjectName,
-        robotProjectId: robotSectionInfo?.robot?.projectId
-      });
-
+       
       if (currentUserRole !== 'user') {
-        console.log("👨‍💼 Admin/Dashboard user - showing all messages");
         return true;
       }
 
       if (!robotSectionInfo || !robotSectionInfo.robot) {
-        console.log("❌ No robot info - cannot filter");
         return false;
       }
 
       const robotProjectId = robotSectionInfo.robot.projectId;
-      console.log("🤖 Robot's projectId from database:", robotProjectId);
 
       if (!robotProjectId) {
-        console.log("❌ Robot has no projectId assigned");
         return false;
       }
 
       if (!currentProjectName) {
-        console.log("❌ No project name in cookies");
         return false;
       }
 
@@ -282,24 +264,19 @@ export function MqttProvider({ children }) {
         });
 
         if (!userProject) {
-          console.log("❌ No matching project found for cookie name:", currentProjectName);
           return false;
         }
 
         const userProjectId = userProject.id || userProject.projectId;
-        console.log("✅ Found user's project ID:", userProjectId);
         
         const shouldShow = String(robotProjectId) === String(userProjectId);
-        console.log(`🔁 Project comparison: ${robotProjectId} === ${userProjectId} => ${shouldShow}`);
         
         return shouldShow;
         
       } catch (error) {
-        console.error("❌ Error fetching projects for comparison:", error);
         return false;
       }
     } catch (error) {
-      console.error("❌ Error in shouldShowMessageToUser:", error);
       return false;
     }
   }, [API_BASE]);
@@ -308,7 +285,6 @@ export function MqttProvider({ children }) {
     try {
       const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
       if (!project) {
-        console.log("❌ Project not found for alert email sending");
         return;
       }
       
@@ -319,7 +295,6 @@ export function MqttProvider({ children }) {
       });
       
       if (projectUsers.length === 0) {
-        console.log("ℹ️ No users found for project:", projectName);
         return;
       }
       
@@ -327,18 +302,16 @@ export function MqttProvider({ children }) {
         if (user.Email || user.email) {
           const userEmail = user.Email || user.email;
           try {
-            await axios.post(`${API_BASE}/sendEmail.php`, {
-              email: userEmail,
-              message: alertMessage,
-              subject: subject
-            });
+            // await axios.post(`${API_BASE}/sendEmail.php`, {
+            //   email: userEmail,
+            //   message: alertMessage,
+            //   subject: subject
+            // });
           } catch (emailError) {
-            console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
           }
         }
       }
     } catch (error) {
-      console.error("❌ Error in sendAlertEmailToProjectUsers:", error);
     }
   }, [API_BASE]);
 
@@ -347,12 +320,10 @@ export function MqttProvider({ children }) {
       const messageKey = createMessageKey(topic, messageString, robotId, sectionName);
       
       if (isMessageDuplicate(topic, messageString, robotId, sectionName)) {
-        console.log("⏭️ Skipping duplicate message (already processed)");
         return null;
       }
       
       if (isSavingToDatabase(messageKey)) {
-        console.log("⏭️ Message is already being saved to database");
         return null;
       }
       
@@ -369,14 +340,7 @@ export function MqttProvider({ children }) {
         trimmed = trimmed.slice(1, -1);
       }
 
-      console.log("📨 PROCESSING MESSAGE (ONCE):", { 
-        topic, 
-        message: trimmed,
-        robotId,
-        sectionName,
-        robotName,
-        messageType
-      });
+      
 
       if (!robotSectionInfo) {
         robotSectionInfo = findRobotAndSectionByTopic(topic);
@@ -388,13 +352,6 @@ export function MqttProvider({ children }) {
       } else {
         topicMain = findTopicMain(topic);
       }
-
-      console.log("🔍 Topic resolution:", {
-        inputTopic: topic,
-        topicMain: topicMain,
-        hasRobotInfo: !!robotSectionInfo,
-        robotName: robotSectionInfo?.robot?.RobotName
-      });
 
       // Extract voltage from message if present
       let extractedVoltage = null;
@@ -436,7 +393,6 @@ export function MqttProvider({ children }) {
       }
 
       if (extractedVoltage !== null && extractedVoltage < 23 && extractedVoltage > 10) {
-        console.log(`🔴 LOW VOLTAGE DETECTED: ${extractedVoltage}V`);
         
         const lowVoltageKey = `low-${robotId}-${sectionName}-${extractedVoltage}`;
         
@@ -478,11 +434,11 @@ export function MqttProvider({ children }) {
                     if (user.Email || user.email) {
                       const userEmail = user.Email || user.email;
                       try {
-                        await axios.post(`${API_BASE}/sendEmail.php`, {
-                          email: userEmail,
-                          message: emailMessage,
-                          subject: `Alert: Robot ${finalMessageObj.robotName} Low Voltage`
-                        });
+                        // await axios.post(`${API_BASE}/sendEmail.php`, {
+                        //   email: userEmail,
+                        //   message: emailMessage,
+                        //   subject: `Alert: Robot ${finalMessageObj.robotName} Low Voltage`
+                        // });
                       } catch (emailError) {
                       }
                     }
@@ -498,7 +454,6 @@ export function MqttProvider({ children }) {
       
       // Check if this is a normal voltage update 
       if (extractedVoltage !== null && extractedVoltage < 23 && extractedVoltage > 10) {
-        console.log(`🟢 NORMAL VOLTAGE UPDATE: ${extractedVoltage}V`);
         
         const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
         if (shouldShow) {
@@ -525,7 +480,6 @@ export function MqttProvider({ children }) {
         );
         
         if (dangerDuplicate) {
-          console.log("⏭️ Skipping duplicate danger message");
           markAsSavedToDatabase(messageKey);
           return null;
         }
@@ -533,24 +487,19 @@ export function MqttProvider({ children }) {
 
       const finalKey = `save-${finalMessageObj.RobotId}-${finalMessageObj.sectionName}-${finalMessageObj.topic_main}-${finalMessageObj.message}-${finalMessageObj.date}-${finalMessageObj.time}`;
       if (messageHistoryRef.current.has(finalKey)) {
-        console.log("⏭️ Skipping duplicate message save (final check)");
         markAsSavedToDatabase(messageKey);
         return null;
       }
       
       messageHistoryRef.current.set(finalKey, Date.now());
 
-      console.log("💾 SAVING MESSAGE (ONCE):", finalMessageObj);
 
       try {
         const notificationResponse = await axios.post(`${API_BASE}/notifications.php`, finalMessageObj);
-        console.log("✅ Notification saved to database with topic_main:", finalMessageObj.topic_main);
 
         try {
           await axios.post(`${API_BASE}/logs.php`, finalMessageObj);
-          console.log("✅ Log saved to database with topic_main:", finalMessageObj.topic_main);
         } catch (logError) {
-          console.warn("Could not save to logs:", logError.message);
         }
 
         const newNotification = {
@@ -575,7 +524,6 @@ export function MqttProvider({ children }) {
           );
           
           if (isDuplicate) {
-            console.log("⏭️ Skipping duplicate notification in state");
             return prev;
           }
           
@@ -587,13 +535,11 @@ export function MqttProvider({ children }) {
         return finalMessageObj;
       } catch (error) {
         markAsSavedToDatabase(messageKey);
-        console.error("❌ Failed to save message to database:", error?.response?.data || error);
         return null;
       }
 
     } catch (err) {
       markAsSavedToDatabase(createMessageKey(topic, messageString, robotId, sectionName));
-      console.error("❌ Error in processAndSaveMessage:", err);
       return null;
     }
   }, [API_BASE, findTopicMain, findRobotAndSectionByTopic, shouldShowMessageToUser]);
@@ -608,7 +554,6 @@ export function MqttProvider({ children }) {
       
       const project = projectsDataRef.current.find(p => p.projectId === projectId || p.id === projectId);
       if (!project) {
-        console.log("❌ Project not found for email sending");
         return;
       }
       
@@ -619,7 +564,6 @@ export function MqttProvider({ children }) {
       });
       
       if (projectUsers.length === 0) {
-        console.log("ℹ️ No users found for project:", projectName);
         return;
       }
       
@@ -629,13 +573,12 @@ export function MqttProvider({ children }) {
         if (user.Email || user.email) {
           const userEmail = user.Email || user.email;
           try {
-            await axios.post(`${API_BASE}/sendEmail.php`, {
-              email: userEmail,
-              message: emailMessage,
-              subject: `Alert: Robot ${robotName} Low Voltage`
-            });
+            // await axios.post(`${API_BASE}/sendEmail.php`, {
+            //   email: userEmail,
+            //   message: emailMessage,
+            //   subject: `Alert: Robot ${robotName} Low Voltage`
+            // });
           } catch (emailError) {
-            console.error(`❌ Failed to send email to ${userEmail}:`, emailError);
           }
         }
       }
@@ -647,17 +590,14 @@ export function MqttProvider({ children }) {
       }, 300000);
       
     } catch (error) {
-      console.error("❌ Error in sendEmailToProjectUsers:", error);
     }
   }, [API_BASE]);
 
   const sendLowVoltageAlert = useCallback(async (robotName, voltage, topic, robotSectionInfo) => {
     try {
-      console.log(`🔴 LOW VOLTAGE ALERT: ${voltage}V in robot ${robotName}`);
       
       const alertKey = `voltage-alert-${robotSectionInfo?.robot?.id}-${voltage}`;
       if (dangerMessagesSet.current.has(alertKey)) {
-        console.log("⏭️ Skipping duplicate voltage alert");
         return;
       }
       
@@ -688,14 +628,12 @@ export function MqttProvider({ children }) {
       );
       
       if (msgObj && !isDangerMessageDuplicate(alertMessage, robotSectionInfo?.robot?.id, robotSectionInfo?.sectionName, voltage)) {
-        console.log("✅ Low voltage alert saved to notifications and logs with topic_main:", msgObj.topic_main);
         
         dangerMessagesSet.current.add(alertKey);
         setTimeout(() => {
           dangerMessagesSet.current.delete(alertKey);
         }, 30000);
       } else {
-        console.log("⏭️ Skipping duplicate voltage alert (already processed)");
       }
       
       // if (robotSectionInfo && robotSectionInfo.robot) {
@@ -704,7 +642,6 @@ export function MqttProvider({ children }) {
       // }
       
     } catch (error) {
-      console.error("❌ Failed to send low voltage alert:", error);
     }
   }, [API_BASE, shouldShowMessageToUser, processAndSaveMessage, isDangerMessageDuplicate]);
 
@@ -713,7 +650,6 @@ export function MqttProvider({ children }) {
       const processingKey = `halfcycle-${robotId}-${sectionName}`;
       
       if (processingMessagesRef.current.has(processingKey)) {
-        console.log("⏭️ Skipping duplicate half-cycle processing");
         return;
       }
       
@@ -722,26 +658,22 @@ export function MqttProvider({ children }) {
         processingMessagesRef.current.delete(processingKey);
       }, 5000);
       
-      console.log(`🔄 HANDLING HALF CYCLE FINISHED for ${robotId}-${sectionName}`);
       
       let currentRobot;
       try {
         const response = await axios.get(`${API_BASE}/robots/${robotId}`);
         currentRobot = response.data;
       } catch (error) {
-        console.error("❌ Failed to fetch robot data:", error);
         currentRobot = robotsDataRef.current.find(r => r.id === robotId);
       }
       
       if (!currentRobot || !currentRobot.Sections || !currentRobot.Sections[sectionName]) {
-        console.error("❌ Robot or section not found");
         return;
       }
       
       const currentCycles = currentRobot.Sections[sectionName]?.Cycles || 0;
       const newCycles = parseFloat(currentCycles) + 0.5;
       
-      console.log(`🔢 Increasing cycles: ${currentCycles} → ${newCycles}`);
       
       const updatedSections = {
         ...currentRobot.Sections,
@@ -758,7 +690,6 @@ export function MqttProvider({ children }) {
       
       try {
         const response = await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
-        console.log("✅ HALF CYCLE UPDATE SUCCESS:", response.data);
         
         const updatedRobot = response.data;
         const index = robotsDataRef.current.findIndex(r => r.id === robotId);
@@ -793,15 +724,12 @@ export function MqttProvider({ children }) {
             toast.success(toastMessage);
           }
         } else {
-          console.log("⏭️ Skipping half-cycle toast (user not in same project)");
         }
         
       } catch (error) {
-        console.error("❌ HALF CYCLE UPDATE FAILED:", error);
       }
       
     } catch (error) {
-      console.error("❌ Error in handleHalfCycleFinished:", error);
     }
   }, [API_BASE, shouldShowMessageToUser, processAndSaveMessage]);
 
@@ -884,7 +812,6 @@ export function MqttProvider({ children }) {
     
     const currentUserRole = userRoleRef.current;
     if (currentUserRole === 'user' && messageString.includes('message_status:{cycles:')) {
-      console.log("⏭️ Skipping cycles message_status for user");
       return null;
     }
     
@@ -976,7 +903,6 @@ export function MqttProvider({ children }) {
       }
       
     } catch (error) {
-      console.error("❌ SEPARATE UPDATES FAILED:", error);
     }
   }, [API_BASE]);
 
@@ -1053,17 +979,14 @@ export function MqttProvider({ children }) {
     if (isInitialized) return;
 
     try {
-      console.log("Fetching robots from API for MQTT connections...");
       
       const robotsArray = await fetchInitialData();
       
       if (!robotsArray.length) {
-        console.log("No robots data available yet");
         setIsInitialized(true);
         return;
       }
       
-      console.log(`Found ${robotsArray.length} robots from API`);
       
       let allConnections = [];
       const newClients = {};
@@ -1073,10 +996,8 @@ export function MqttProvider({ children }) {
         allConnections = [...allConnections, ...robotConnections];
       });
       
-      console.log(`Extracted ${allConnections.length} MQTT connections from robots`);
       
       if (allConnections.length === 0) {
-        console.log("No MQTT connections found in robot data");
         setIsInitialized(true);
         return;
       }
@@ -1085,7 +1006,6 @@ export function MqttProvider({ children }) {
         try {
           const connectUrl = `wss://${connection.host}:${connection.port}/mqtt`;
           
-          console.log(`Connecting to MQTT for ${connection.robotName} - ${connection.sectionName}...`);
           
           const client = mqtt.connect(connectUrl, {
             clientId: connection.clientId,
@@ -1098,7 +1018,6 @@ export function MqttProvider({ children }) {
           });
 
           client.on("connect", () => {
-            console.log(`✅ MQTT Connected to: ${connection.robotName} - ${connection.sectionName}`);
             
             setActiveConnections(prev => {
               const existing = prev.filter(conn => 
@@ -1114,9 +1033,7 @@ export function MqttProvider({ children }) {
             if (connection.topicSubscribe) {
               client.subscribe(connection.topicSubscribe, (err) => {
                 if (err) {
-                  console.error(`Subscribe error for ${connection.robotName}:`, err);
                 } else {
-                  console.log(`✅ Subscribed ONLY to Topic_subscribe: ${connection.topicSubscribe} for ${connection.robotName}`);
                 }
               });
             }
@@ -1127,17 +1044,10 @@ export function MqttProvider({ children }) {
               const messageString = payload.toString();
               
               if (isMessageDuplicate(topic, messageString, connection.robotId, connection.sectionName)) {
-                console.log("⏭️ Skipping duplicate message in MQTT handler");
                 return;
               }
               
-              console.log(`📩 MQTT Message from ${connection.robotName}:`, {
-                topic,
-                message: messageString,
-                robotId: connection.robotId,
-                robotName: connection.robotName,
-                sectionName: connection.sectionName
-              });
+              
               
               const messageLower = messageString.toLowerCase();
               const messageExact = messageString.trim();
@@ -1152,7 +1062,6 @@ export function MqttProvider({ children }) {
               try {
                 const parsedMessage = JSON.parse(messageString);
                 if (parsedMessage.type && parsedMessage.message) {
-                  console.log("📋 PROCESSING JSON MESSAGE WITH TYPE:", parsedMessage.type);
                   
                   const msgObj = await processAndSaveMessage(
                     topic, 
@@ -1167,7 +1076,6 @@ export function MqttProvider({ children }) {
                   );
                   
                   if (msgObj) {
-                    console.log("✅ JSON message processed and saved:", msgObj);
                     
                     const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
                     
@@ -1207,10 +1115,8 @@ export function MqttProvider({ children }) {
                               parsedMessage.message,
                               `Alert: Robot ${robotDisplayName}`
                             ).catch(error => {
-                              console.error("❌ Failed to send alert email:", error);
                             });
                           } else {
-                            console.log("⏭️ Skipping duplicate alert email");
                           }
                         }
                       } else {
@@ -1233,7 +1139,6 @@ export function MqttProvider({ children }) {
               }
               
               if (isHalfCycle) {
-                console.log(`🎯 HALF CYCLE FINISHED DETECTED for ${connection.robotName}`);
                 await handleHalfCycleFinished(
                   connection.robotId, 
                   connection.sectionName, 
@@ -1247,7 +1152,6 @@ export function MqttProvider({ children }) {
               const messageData = extractAllDataFromMessage(messageString);
               
               if (messageData) {
-                console.log("🎯 PROCESSING MESSAGE_STATUS DATA:", messageData);
                 
                 try {
                   if (robotSectionInfo) {
@@ -1263,15 +1167,12 @@ export function MqttProvider({ children }) {
                     );
                     
                   } else {
-                    console.log("❌ No matching robot found for topic:", topic);
                   }
                 } catch (error) {
-                  console.error("❌ Error processing message update:", error);
                 }
                 return; 
               }
               
-              console.log("📝 PROCESSING NORMAL MESSAGE...");
               
               const msgObj = await processAndSaveMessage(
                 topic, 
@@ -1285,7 +1186,6 @@ export function MqttProvider({ children }) {
               );
               
               if (msgObj) {
-                console.log("✅ Message processed and saved (ONCE):", msgObj);
                 
                 const shouldShow = await shouldShowMessageToUser(robotSectionInfo);
                 
@@ -1329,10 +1229,8 @@ export function MqttProvider({ children }) {
                             msgObj.message,
                             `Alert: Robot ${robotDisplayName}`
                           ).catch(error => {
-                            console.error("❌ Failed to send alert email:", error);
                           });
                         } else {
-                          console.log("⏭️ Skipping duplicate alert email");
                         }
                       }
                     }
@@ -1348,17 +1246,14 @@ export function MqttProvider({ children }) {
                     }
                   }
                 } else {
-                  console.log("⏭️ Skipping toast (user not in same project or schedule message for user)");
                 }
               }
 
             } catch (error) {
-              console.error("Error processing MQTT message:", error);
             }
           });
 
           client.on("error", (error) => {
-            console.error(`❌ MQTT Error for ${connection.robotName} - ${connection.sectionName}:`, error);
             setActiveConnections(prev => 
               prev.map(conn => 
                 (conn.robotId === connection.robotId && conn.sectionName === connection.sectionName)
@@ -1369,7 +1264,6 @@ export function MqttProvider({ children }) {
           });
 
           client.on("close", () => {
-            console.log(`🔌 MQTT Disconnected from ${connection.robotName} - ${connection.sectionName}`);
             setActiveConnections(prev => 
               prev.map(conn => 
                 (conn.robotId === connection.robotId && conn.sectionName === connection.sectionName)
@@ -1380,7 +1274,6 @@ export function MqttProvider({ children }) {
           });
 
           client.on("offline", () => {
-            console.log(`📴 ${connection.robotName} - ${connection.sectionName} is offline`);
             setActiveConnections(prev => 
               prev.map(conn => 
                 (conn.robotId === connection.robotId && conn.sectionName === connection.sectionName)
@@ -1394,7 +1287,6 @@ export function MqttProvider({ children }) {
           clientsRef.current[`${connection.robotId}-${connection.sectionName}`] = client;
 
         } catch (error) {
-          console.error(`Failed to create MQTT connection for ${connection.robotName} - ${connection.sectionName}:`, error);
         }
       });
 
@@ -1403,7 +1295,6 @@ export function MqttProvider({ children }) {
       setIsInitialized(true);
       
     } catch (error) {
-      console.error("Failed to fetch robots from API:", error);
       setIsInitialized(true);
     }
   }, [API_BASE, isInitialized, fetchInitialData, extractAllDataFromMessage, updateRobotSectionData, processAndSaveMessage, findRobotAndSectionByTopic, handleHalfCycleFinished, shouldShowMessageToUser, sendAlertEmailToProjectUsers]);
@@ -1413,7 +1304,6 @@ export function MqttProvider({ children }) {
     const client = clientsRef.current[clientKey];
     
     if (client) {
-      console.log(`Reconnecting ${robotId}-${sectionName}...`);
       client.end();
       
       setTimeout(() => {
@@ -1423,7 +1313,6 @@ export function MqttProvider({ children }) {
   }, [fetchAndConnectRobots]);
 
   const reconnectAll = useCallback(() => {
-    console.log("Reconnecting all MQTT connections...");
     Object.values(clientsRef.current).forEach(client => {
       if (client && client.end) {
         client.end();
@@ -1445,29 +1334,24 @@ export function MqttProvider({ children }) {
     const client = clientsRef.current[clientKey];
     
     if (!client || !client.connected) {
-      console.error(`Cannot publish: No connected client for ${robotId}-${sectionName}`);
       return false;
     }
     
     try {
       client.publish(topic, message);
-      console.log(`📤 Published to ${robotId}-${sectionName}: ${topic} -> ${message}`);
       
       return true;
     } catch (error) {
-      console.error(`Publish failed for ${robotId}-${sectionName}:`, error);
       return false;
     }
   }, []);
 
   const publishButtonMessage = useCallback((robotId, sectionName, topic, buttonValue) => {
     try {
-      console.log("🔄 publishButtonMessage CALLED:", { robotId, sectionName, topic, buttonValue });
       
       const actualButtonName = findActualButtonName(topic, buttonValue);
       const finalMessage = actualButtonName;
       
-      console.log("📤 SENDING FINAL MESSAGE:", finalMessage);
       
       const published = publishMessage(robotId, sectionName, topic, finalMessage);
       
@@ -1503,7 +1387,6 @@ export function MqttProvider({ children }) {
           };
           
           axios.post(`${API_BASE}/logs.php`, logMessage).catch(err => {
-            console.error("❌ Failed to save button press log:", err);
           });
         }
       }
@@ -1511,7 +1394,6 @@ export function MqttProvider({ children }) {
       return published;
       
     } catch (e) {
-      console.error("publishButtonMessage error:", e);
       return false;
     }
   }, [publishMessage, findActualButtonName, findTopicMain, API_BASE]);
@@ -1532,13 +1414,11 @@ export function MqttProvider({ children }) {
 
   useEffect(() => {
     return () => {
-      console.log("Cleaning up all MQTT connections...");
       Object.values(clientsRef.current).forEach(client => {
         if (client && client.end) {
           try {
             client.end();
           } catch (error) {
-            console.error("Error ending client:", error);
           }
         }
       });

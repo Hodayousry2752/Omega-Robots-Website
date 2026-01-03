@@ -41,10 +41,8 @@ export default function Login() {
         if (savedUsers) {
           const usernames = JSON.parse(savedUsers);
           setSavedUsernames(usernames || []);
-          console.log("✅ Loaded saved usernames:", usernames?.length || 0);
         }
       } catch (error) {
-        console.error("Error loading saved usernames:", error);
       }
 
       try {
@@ -52,11 +50,9 @@ export default function Login() {
         if (savedCredentials) {
           const credentials = JSON.parse(savedCredentials);
           if (credentials && credentials.username) {
-            console.log("✅ Remember Me data is available (not auto-filled)");
           }
         }
       } catch (error) {
-        console.error("Error loading saved credentials:", error);
       }
 
       const savedAuth = localStorage.getItem("isAuthenticated");
@@ -112,17 +108,14 @@ export default function Login() {
         const trimmedList = updatedUsernames.slice(0, 10);
         setSavedUsernames(trimmedList);
         localStorage.setItem("omega_saved_usernames", JSON.stringify(trimmedList));
-        console.log("✅ Username added to suggestions:", username);
       } else {
         const updatedUsernames = [...savedUsernames];
         updatedUsernames[existingIndex] = username;
         const trimmedList = updatedUsernames.slice(0, 10);
         setSavedUsernames(trimmedList);
         localStorage.setItem("omega_saved_usernames", JSON.stringify(trimmedList));
-        console.log("✅ Username updated in suggestions:", username);
       }
     } catch (error) {
-      console.error("Error saving username:", error);
     }
   };
 
@@ -134,18 +127,14 @@ export default function Login() {
         timestamp: Date.now()
       };
       localStorage.setItem("omega_remember_me", JSON.stringify(credentials));
-      console.log("✅ Credentials saved for remember me");
     } catch (error) {
-      console.error("Error saving credentials:", error);
     }
   };
 
   const clearSavedCredentials = () => {
     try {
       localStorage.removeItem("omega_remember_me");
-      console.log("✅ Saved credentials cleared");
     } catch (error) {
-      console.error("Error clearing credentials:", error);
     }
   };
 
@@ -178,7 +167,6 @@ export default function Login() {
         }
       }
     } catch (error) {
-      console.error("Error loading credentials for selected user:", error);
     }
   };
 
@@ -307,7 +295,6 @@ export default function Login() {
           }
         }
       } catch (fetchError) {
-        console.log("Could not fetch users list:", fetchError);
         // Continue with login attempts even if we couldn't fetch users list
       }
 
@@ -319,14 +306,12 @@ export default function Login() {
           });
           
           if (data?.message === "Login successful" && data?.user) {
-            console.log(`✅ Login successful with ${attempt.description}: ${attempt.username}`);
             userData = data.user;
             successfulUsername = attempt.username;
             loginSuccessful = true;
             break;
           }
         } catch (error) {
-          console.log(`❌ Login failed with ${attempt.description}: ${attempt.username}`);
         }
       }
 
@@ -370,7 +355,6 @@ export default function Login() {
         }
       }
     } catch (error) {
-      console.error("Login error:", error);
       toast.error("Network error. Please check your connection and try again.", {
         style: { 
           background: '#ef4444', 

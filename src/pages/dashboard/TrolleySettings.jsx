@@ -15,7 +15,6 @@ export default function TrolleySettings() {
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const MAIN_COLOR = "#0d9488";
 
-  console.log("TrolleySettings - Component mounted with ID:", id);
 
   const getButtonColor = (color) => color?.trim() || MAIN_COLOR;
 
@@ -38,7 +37,6 @@ export default function TrolleySettings() {
         section: "car",
       };
     } catch (err) {
-      console.error(`Error fetching button ${btnId} details:`, err);
       return {
         id: btnId,
         name: btn.Name || btn.BtnName || btn.id || btn,
@@ -58,10 +56,8 @@ export default function TrolleySettings() {
     try {
       setLoading(true);
       setError(null);
-      console.log("Fetching robot data for ID:", id);
       
       const robotData = await getData(`${BASE_URL}/robots/${id}`);
-      console.log("Robot data received:", robotData);
       
       setRobot(robotData);
 
@@ -69,19 +65,16 @@ export default function TrolleySettings() {
 
       // Car buttons (trolley)
       if (robotData.isTrolley === 1 && robotData.Sections?.car?.ActiveBtns) {
-        console.log("Found trolley buttons:", robotData.Sections.car.ActiveBtns);
         for (const btn of robotData.Sections.car.ActiveBtns) {
           const detailedBtn = await fetchButtonDetails(btn);
           if (detailedBtn) carBtns.push(detailedBtn);
         }
       } else {
-        console.log("No trolley buttons found. isTrolley:", robotData.isTrolley, "Sections.car:", robotData.Sections?.car);
       }
 
       setCarButtons(carBtns);
 
     } catch (err) {
-      console.error('Error fetching data:', err);
       setError(`Failed to load trolley data: ${err.message}`);
     } finally {
       setLoading(false);
@@ -90,10 +83,8 @@ export default function TrolleySettings() {
 
   useEffect(() => {
     if (id) {
-      console.log("useEffect triggered with ID:", id);
       fetchData();
     } else {
-      console.error("No ID found in useParams");
       setError("No robot ID provided in URL");
       setLoading(false);
     }
@@ -102,12 +93,10 @@ export default function TrolleySettings() {
   const handleButtonClick = (btn) => {
     const btnId = extractButtonId(btn);
     if (!btnId) return alert("Invalid button data (missing id or name)");
-    console.log("Navigating to button:", btnId);
     navigate(`/homeDashboard/trolleySettings/${id}/button/${btnId}`);
   };
 
   const handleAddButton = () => {
-    console.log("Adding new button for trolley");
     navigate(`/homeDashboard/trolleySettings/${id}/button/new`);
   };
 

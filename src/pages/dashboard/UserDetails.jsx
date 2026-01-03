@@ -18,9 +18,7 @@ export default function UserDetails() {
         const response = await getData(`${BASE_URL}/users/${id}`);
         const userData = Array.isArray(response) ? response[0] : response;
         setUser(userData);
-        console.log("User details:", userData);
       } catch (error) {
-        console.error("Error fetching user:", error);
       }
     };
     fetchUser();

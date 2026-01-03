@@ -104,7 +104,6 @@ const [preview, setPreview] = useState(null);
   const getLatestRobotId = async () => {
     try {
       const robots = await getData(`${BASE_URL}/robots`);
-      console.log(" Raw robots data:", robots);
 
       if (robots && Array.isArray(robots) && robots.length > 0) {
         const latestRobot = robots.reduce((prev, current) => {
@@ -124,13 +123,10 @@ const [preview, setPreview] = useState(null);
           latestRobot.id ||
           latestRobot.robotId ||
           latestRobot.robotID;
-        console.log(" Latest robot ID found:", latestId);
         return latestId;
       }
-      console.log("No robots found in response");
       return null;
     } catch (error) {
-      console.error(" Error fetching latest robot ID:", error);
       return null;
     }
   };
@@ -151,7 +147,6 @@ const [preview, setPreview] = useState(null);
       }
       return null;
     } catch (error) {
-      console.error("Error finding robot by name:", error);
       return null;
     }
   };
@@ -192,7 +187,6 @@ const [preview, setPreview] = useState(null);
         }
       }
 
-      console.log(" Sending robot data:", dataToSend);
 
       let response;
       let robotId;
@@ -200,10 +194,8 @@ const [preview, setPreview] = useState(null);
       if (isEditMode) {
         response = await putData(`${BASE_URL}/robots/${id}`, dataToSend);
         robotId = id;
-        console.log(" Edit mode - Robot ID:", robotId);
       } else {
         response = await postData(`${BASE_URL}/robots`, dataToSend);
-        console.log(" Robot creation response:", response);
 
         robotId =
           response?.insertedId ||
@@ -212,14 +204,11 @@ const [preview, setPreview] = useState(null);
           response?.robotId;
 
         if (!robotId) {
-          console.log(" Trying alternative methods to get robot ID...");
 
           robotId = await findRobotIdByName(formData.RobotName);
-          console.log(" Robot ID found by name:", robotId);
 
           if (!robotId) {
             robotId = await getLatestRobotId();
-            console.log(" Latest robot ID:", robotId);
           }
 
           if (!robotId) {
@@ -227,16 +216,13 @@ const [preview, setPreview] = useState(null);
             const match = url.match(/[?&]id=(\d+)/);
             if (match) {
               robotId = match[1];
-              console.log(" Robot ID from URL:", robotId);
             }
           }
         }
       }
 
-      console.log(" Final Robot ID:", robotId);
 
       if (!robotId) {
-        console.error(" Could not determine robot ID");
         toast.warning(
           `Robot ${isEditMode ? "updated" : "added"} successfully, but could not automatically add buttons. Please add them manually.`
         );
@@ -245,13 +231,10 @@ const [preview, setPreview] = useState(null);
       }
 
       try {
-        console.log(" Processing buttons for robot:", robotId);
-        console.log(" Buttons to process:", formData.ActiveBtns);
+       
 
         await postButtons(robotId, formData.ActiveBtns);
-        console.log(" Buttons added successfully!");
       } catch (btnError) {
-        console.error("Buttons operation failed:", btnError);
         toast.warning(
           `Robot ${isEditMode ? "updated" : "added"} successfully, but there was an issue with the buttons.`
         );
@@ -274,7 +257,6 @@ const [preview, setPreview] = useState(null);
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error(" Main operation failed:", error);
       toast.error("Failed to save robot. Please check connection.");
     } finally {
       setSubmitting(false);

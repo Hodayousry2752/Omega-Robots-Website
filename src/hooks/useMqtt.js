@@ -28,13 +28,7 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         const usersRes = await axios.get(`${API_BASE}/users`);
         setUsersData(usersRes.data);
         
-        console.log("✅ Initial data loaded:", {
-          robots: robotsRes.data.length,
-          projects: projectsRes.data.length,
-          users: usersRes.data.length
-        });
       } catch (err) {
-        console.error("Failed to fetch initial data:", err);
       }
     };
     fetchInitialData();
@@ -43,17 +37,14 @@ export default function useMqtt({ host, port, clientId, username, password }) {
   // Helper function to send email to project users
   const sendEmailToProjectUsers = async (projectId, robotName, voltage) => {
     try {
-      console.log("📧 STARTING EMAIL SENDING PROCESS...", { projectId, robotName, voltage });
       
       // Find project by ID
       const project = projectsData.find(p => p.projectId === projectId || p.id === projectId);
       if (!project) {
-        console.log("❌ Project not found for ID:", projectId);
         return;
       }
       
       const projectName = project.ProjectName;
-      console.log("✅ Found project:", projectName);
       
       // Find users in this project
       const projectUsers = usersData.filter(user => 
@@ -61,12 +52,10 @@ export default function useMqtt({ host, port, clientId, username, password }) {
       );
       
       if (projectUsers.length === 0) {
-        console.log("ℹ️ No users found for project:", projectName);
         return;
       }
       
-      console.log(`📧 Found ${projectUsers.length} user(s) for project ${projectName}:`, 
-        projectUsers.map(u => u.Email));
+      
       
       // Prepare email message
       const emailMessage = `⚠️ Danger Alert: Robot "${robotName}" voltage is critically low (${voltage}V)!`;
@@ -75,27 +64,22 @@ export default function useMqtt({ host, port, clientId, username, password }) {
       for (const user of projectUsers) {
         if (user.Email) {
           try {
-            console.log(`📧 Sending email to: ${user.Email}`);
             
             await axios.post(`${API_BASE}/sendEmail.php`, {
               email: user.Email,
               message: emailMessage
             });
             
-            console.log(`✅ Email sent to ${user.Email}`);
           } catch (emailError) {
-            console.error(`❌ Failed to send email to ${user.Email}:`, emailError);
           }
         }
       }
       
     } catch (error) {
-      console.error("❌ Error in sendEmailToProjectUsers:", error);
     }
   };
 
   const findActualButtonName = (topic, buttonValue) => {
-    console.log("🔍 SEARCHING FOR ACTUAL BUTTON NAME:", { topic, buttonValue });
     
     for (const robot of robotsData) {
       if (!robot || !robot.Sections) continue;
@@ -105,32 +89,26 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         if (!section) continue;
         
         if (section.Topic_main === topic || section.Topic_subscribe === topic) {
-          console.log("✅ FOUND MATCHING SECTION:", sectionKey);
           
           if (section.ActiveBtns && Array.isArray(section.ActiveBtns)) {
             for (const activeBtn of section.ActiveBtns) {
-              console.log("🔍 CHECKING ACTIVE BTN:", activeBtn);
               
               if (activeBtn && activeBtn.Name && 
                   activeBtn.Name.toLowerCase() === buttonValue.toLowerCase()) {
-                console.log("✅ FOUND ACTUAL BUTTON NAME:", activeBtn.Name);
                 return activeBtn.Name;
               }
               
               if (activeBtn && activeBtn.Command && activeBtn.Command === buttonValue) {
-                console.log("✅ FOUND BUTTON BY COMMAND:", activeBtn.Name);
                 return activeBtn.Name;
               }
             }
           }
           
-          console.log("ℹ️ USING BUTTON VALUE AS NAME:", buttonValue);
           return buttonValue;
         }
       }
     }
     
-    console.log("❌ NO BUTTON FOUND, USING:", buttonValue);
     return buttonValue;
   };
 
@@ -164,12 +142,10 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         trimmed = trimmed.slice(1, -1);
       }
 
-      console.log("📨 PROCESSING MESSAGE:", { topic, message: trimmed, isFromButton, buttonName });
 
       try {
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
           const parsed = JSON.parse(trimmed);
-          console.log("✅ PARSED JSON MESSAGE:", parsed);
           
           if (isFromButton && buttonName) {
             finalMessageObj = {
@@ -189,7 +165,6 @@ export default function useMqtt({ host, port, clientId, username, password }) {
             };
           }
         } else {
-          console.log("📝 PLAIN TEXT MESSAGE");
           if (isFromButton && buttonName) {
             finalMessageObj = {
               topic_main: findTopicMain(topic),
@@ -209,7 +184,6 @@ export default function useMqtt({ host, port, clientId, username, password }) {
           }
         }
       } catch (parseError) {
-        console.log("❌ JSON PARSE FAILED, USING PLAIN TEXT");
         if (isFromButton && buttonName) {
           finalMessageObj = {
             topic_main: findTopicMain(topic),
@@ -229,32 +203,26 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         }
       }
 
-      console.log("💾 FINAL MESSAGE OBJECT:", finalMessageObj);
 
       try {
         await axios.post(`${API_BASE}/notifications.php`, finalMessageObj);
-        console.log("✅ Notification saved");
 
         await axios.post(`${API_BASE}/logs.php`, finalMessageObj);
-        console.log("✅ Log saved");
 
         setMessages(prev => [...prev, finalMessageObj]);
         
         return finalMessageObj;
       } catch (error) {
-        console.error("❌ Failed to save message:", error?.response?.data || error);
         return null;
       }
 
     } catch (err) {
-      console.error("❌ Error in processAndSaveMessage:", err);
       return null;
     }
   };
 
   const sendLowVoltageAlert = async (robotName, voltage, topic, robotSectionInfo) => {
     try {
-      console.log(`🔴 LOW VOLTAGE ALERT: ${voltage}V in robot ${robotName}`);
       
       alert(`⚠️ Danger Alert: Robot "${robotName}" voltage is critically low (${voltage}V)!`);
       
@@ -268,27 +236,22 @@ export default function useMqtt({ host, port, clientId, username, password }) {
 
       await axios.post(`${API_BASE}/notifications.php`, alertMessage);
       await axios.post(`${API_BASE}/logs.php`, alertMessage);
-      console.log("✅ Low voltage alert saved to both databases");
       
       // Get projectId from robotSectionInfo
       if (robotSectionInfo && robotSectionInfo.robot) {
         const projectId = robotSectionInfo.robot.projectId;
-        console.log("🔍 Found projectId for email sending:", projectId);
         
         // Send emails to project users
         await sendEmailToProjectUsers(projectId, robotName, voltage);
       } else {
-        console.log("❌ No robot section info available for email sending");
       }
       
     } catch (error) {
-      console.error("❌ Failed to send low voltage alert:", error);
     }
   };
 
   const updateAllFieldsSeparately = async (robotId, sectionName, updatedData) => {
     try {
-      console.log("🔄 UPDATING ALL FIELDS SEPARATELY:", { robotId, sectionName, updatedData });
       
       const currentRobotResponse = await axios.get(`${API_BASE}/robots/${robotId}`);
       const currentRobot = currentRobotResponse.data;
@@ -309,8 +272,8 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         
         updates.push(
           axios.put(`${API_BASE}/robots.php/${robotId}`, voltagePayload)
-            .then(() => console.log(`✅ VOLTAGE UPDATED: ${updatedData.voltage}`))
-            .catch(err => console.error(`❌ VOLTAGE UPDATE FAILED:`, err))
+            .then(() => console.log(``))
+            .catch(err => console.error())
         );
       }
       
@@ -329,8 +292,8 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         
         updates.push(
           axios.put(`${API_BASE}/robots.php/${robotId}`, statusPayload)
-            .then(() => console.log(`✅ STATUS UPDATED: "${updatedData.mode}"`))
-            .catch(err => console.error(`❌ STATUS UPDATE FAILED:`, err))
+            .then(() => console.log())
+            .catch(err => console.error())
         );
       }
       
@@ -358,16 +321,16 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         await updates[i];
       }
       
-      console.log("✅ ALL SEPARATE UPDATES COMPLETED");
+      
       
     } catch (error) {
-      console.error("❌ SEPARATE UPDATES FAILED:", error);
+      
     }
   };
 
   const updateRobotSectionData = async (robotId, sectionName, updatedData, robotName, topic, robotSectionInfo) => {
     try {
-      console.log("🔄 ATTEMPTING SINGLE UPDATE WITH ALL FIELDS");
+      
       
       const currentRobotResponse = await axios.get(`${API_BASE}/robots/${robotId}`);
       const currentRobot = currentRobotResponse.data;
@@ -387,28 +350,23 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         Sections: updatedSections
       };
 
-      console.log("📦 SINGLE PAYLOAD:", updatedSections);
+      
 
       const response = await axios.put(`${API_BASE}/robots.php/${robotId}`, updatePayload);
-      console.log("✅ SINGLE UPDATE RESPONSE:", response.data);
       
       if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
-        console.log("🔴 LOW VOLTAGE DETECTED, SENDING ALERT...");
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       
       setTimeout(async () => {
-        console.log("🔄 STARTING SEPARATE UPDATES AS BACKUP...");
         await updateAllFieldsSeparately(robotId, sectionName, updatedData);
       }, 500);
       
       return response.data;
     } catch (error) {
-      console.error("❌ SINGLE UPDATE FAILED, using separate updates...");
       await updateAllFieldsSeparately(robotId, sectionName, updatedData);
       
       if (updatedData.voltage !== undefined && updatedData.voltage < 15) {
-        console.log("🔴 LOW VOLTAGE DETECTED, SENDING ALERT...");
         await sendLowVoltageAlert(robotName, updatedData.voltage, topic, robotSectionInfo);
       }
       
@@ -431,26 +389,23 @@ export default function useMqtt({ host, port, clientId, username, password }) {
   };
 
   const extractAllDataFromMessage = (messageString) => {
-    console.log("🔍 EXTRACTING ALL DATA FROM MESSAGE:", messageString);
+    console.log();
     
     const statusData = {};
     
     const voltageMatch = messageString.match(/voltage:\s*(\d+)/i);
     if (voltageMatch) {
       statusData.voltage = parseInt(voltageMatch[1]);
-      console.log("✅ EXTRACTED VOLTAGE:", statusData.voltage);
     }
     
     const modeMatch = messageString.match(/mode:\s*([a-zA-Z]+)/i);
     if (modeMatch) {
       statusData.mode = modeMatch[1];
-      console.log("✅ EXTRACTED MODE:", statusData.mode);
     }
     
     // const cyclesMatch = messageString.match(/cycles:\s*(\d+)/i);
     // if (cyclesMatch) {
     //   statusData.cycles = parseInt(cyclesMatch[1]);
-    //   console.log("✅ EXTRACTED CYCLES:", statusData.cycles);
     // }
     
     return Object.keys(statusData).length > 0 ? statusData : null;
@@ -473,48 +428,36 @@ export default function useMqtt({ host, port, clientId, username, password }) {
 
     client.on("connect", () => {
       setIsConnected(true);
-      console.log("✅ MQTT Connected");
+      console.log();
 
       robotsData.forEach(robot => {
         if (robot.Sections) {
           Object.values(robot.Sections).forEach(section => {
             if (section.Topic_subscribe) {
               client.subscribe(section.Topic_subscribe, { qos: 0 });
-              console.log("✅ Subscribed to:", section.Topic_subscribe);
+              console.log();
             }
           });
         }
       });
     });
 
-    client.on("error", (err) => console.log("❌ MQTT Error:", err));
+    client.on("error", (err) => console.log());
 
     client.on("message", async (topic, message) => {
-      console.log("📨 RAW MQTT MESSAGE:", { topic, message: message.toString() });
 
       const messageString = message.toString();
       
       const messageData = extractAllDataFromMessage(messageString);
       
       if (messageData) {
-        console.log("🎯 PROCESSING MESSAGE_STATUS DATA:", messageData);
         
         try {
           const robotSectionInfo = findRobotAndSectionByTopic(topic);
           
           if (robotSectionInfo) {
             const { robot, sectionName, section } = robotSectionInfo;
-            console.log("🤖 FOUND ROBOT FOR UPDATE:", {
-              robotId: robot.id,
-              sectionName,
-              robotName: robot.RobotName,
-              projectId: robot.projectId,
-              currentData: {
-                Voltage: section.Voltage,
-                Status: section.Status,
-                Cycles: section.Cycles
-              }
-            });
+           
             
             await updateRobotSectionData(
               robot.id, 
@@ -524,20 +467,15 @@ export default function useMqtt({ host, port, clientId, username, password }) {
               topic, 
               robotSectionInfo
             );
-            console.log("✅ UPDATE PROCESS INITIATED FOR ALL FIELDS");
             
           } else {
-            console.log("❌ No matching robot found for topic:", topic);
           }
         } catch (error) {
-          console.error("❌ Error processing message update:", error);
         }
       } else {
-        console.log("📝 PROCESSING NORMAL MESSAGE...");
         const msgObj = await processAndSaveMessage(topic, messageString, false, null);
         
         if (msgObj) {
-          console.log("✅ Message processed and saved:", msgObj);
         }
       }
     });
@@ -552,13 +490,11 @@ export default function useMqtt({ host, port, clientId, username, password }) {
     const isStatusUpdate = lastMsg.message.includes('message_status:');
 
     if (!isStatusUpdate) {
-      console.log("📝 Backup: Message already saved in database");
     }
   }, [messages, isConnected]);
 
   const publish = (topic, msg, isFromButton = false, buttonName = null) => {
     if (!clientRef.current) {
-      console.warn("MQTT client not ready - cannot publish");
       return;
     }
     try {
@@ -573,20 +509,17 @@ export default function useMqtt({ host, port, clientId, username, password }) {
         finalPayload = typeof msg === "object" ? JSON.stringify(msg) : String(msg);
       }
 
-      console.log("📤 Publishing MQTT message:", { topic, payload: finalPayload });
       
       clientRef.current.publish(topic, finalPayload, { qos: 0 }, (err) => {
-        if (err) console.error("MQTT publish error:", err);
-        else console.log("✅ MQTT Published:", { topic, payload: finalPayload });
+        if (err) console.error();
+        else console.log();
       });
 
       if (isFromButton || finalButtonName) {
         processAndSaveMessage(topic, finalPayload, true, finalButtonName).catch((e) => {
-          console.warn("Failed to save button press message:", e);
         });
       }
     } catch (e) {
-      console.error("Publish exception:", e);
     }
   };
 
@@ -608,18 +541,15 @@ export default function useMqtt({ host, port, clientId, username, password }) {
 
   const publishButtonMessage = (topic, buttonValue) => {
     try {
-      console.log("🔄 publishButtonMessage CALLED:", { topic, buttonValue });
       
       const actualButtonName = findActualButtonName(topic, buttonValue);
       
       const finalMessage = actualButtonName;
       
-      console.log("📤 SENDING FINAL MESSAGE:", finalMessage);
       
       publish(topic, finalMessage, true, actualButtonName);
       
     } catch (e) {
-      console.error("publishButtonMessage error:", e);
     }
   };
 

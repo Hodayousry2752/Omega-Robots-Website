@@ -88,7 +88,6 @@ export default function NotificationCenter({
         time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
       };
     } catch (err) {
-      console.error('Error converting time:', err);
       return { date, time }; // Return original if conversion fails
     }
   };
@@ -122,7 +121,6 @@ export default function NotificationCenter({
         time: `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`
       };
     } catch (err) {
-      console.error('Error converting timestamp:', err);
       return { date: "Unknown", time: "Unknown" };
     }
   };
@@ -182,7 +180,6 @@ export default function NotificationCenter({
         setError(null);
         
       } catch (err) {
-        console.error("Error fetching notifications:", err);
         setError("Failed to load notifications: " + (err.message || "Unknown error"));
         
         const mqttNotificationsJordan = mqttNotifications.map(note => {
@@ -268,7 +265,6 @@ export default function NotificationCenter({
       setRobots(robotsArray);
       return robotsArray;
     } catch (err) {
-      console.error("Failed to fetch robots:", err);
       return [];
     }
   };

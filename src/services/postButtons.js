@@ -10,11 +10,9 @@ export const postButtons = async (robotId, buttons) => {
 
   try {
     if (buttons.length === 0) {
-      console.log("No buttons to post");
       return { success: true, message: "No buttons to save" };
     }
 
-    console.log(`Posting ${buttons.length} buttons for robot ${robotId}`);
 
     for (const btn of buttons) {
       const payload = {
@@ -25,17 +23,14 @@ export const postButtons = async (robotId, buttons) => {
         projectId: 10,
       };
 
-      console.log("Sending button payload:", payload);
 
       await apiClient.post(`${BASE_URL}/buttons`, payload);
     }
 
     const res = await apiClient.get(`${BASE_URL}/buttons`);
-    console.log("Buttons after posting:", res.data);
 
     return { success: true, data: res.data };
   } catch (error) {
-    console.error("Error posting buttons:", error);
     throw error;
   }
 };

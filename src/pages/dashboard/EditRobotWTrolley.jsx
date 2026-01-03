@@ -42,10 +42,8 @@ export default function EditRobot() {
     const fetchRobot = async () => {
       try {
         setLoading(true);
-        console.log("Fetching robot with ID:", robotId);
 
         const data = await getData(`${BASE_URL}/robots.php/${robotId}`);
-        console.log("Fetched robot data:", data);
 
         if (!data || Object.keys(data).length === 0) {
           throw new Error("No robot data found");
@@ -54,8 +52,7 @@ export default function EditRobot() {
         const mainSection = data.Sections?.main || {};
         const carSection = data.Sections?.car || {};
 
-        console.log("Main section:", mainSection);
-        console.log("Car section:", carSection);
+        
 
         const processedRobot = {
           RobotName: data.RobotName || "",
@@ -94,10 +91,8 @@ export default function EditRobot() {
           };
         }
 
-        console.log("Processed robot:", processedRobot);
         setRobot(processedRobot);
       } catch (err) {
-        console.error("Error fetching robot:", err);
         toast.error("Failed to load robot data.");
       } finally {
         setLoading(false);
@@ -111,12 +106,10 @@ export default function EditRobot() {
 
   // Update functions
   const updateRobotName = (name) => {
-    console.log("Updating robot name to:", name);
     setRobot((prev) => ({ ...prev, RobotName: name }));
   };
 
   const updateImage = (file, preview) => {
-    console.log("Updating image:", file, preview);
     setRobot((prev) => ({
       ...prev,
       Image: file,
@@ -126,7 +119,6 @@ export default function EditRobot() {
 
   const updateMainSection = (updates) => {
     const { Voltage, Cycles, Status, ...allowedUpdates } = updates;
-    console.log("Updating main section (filtered):", allowedUpdates);
     setRobot((prev) => ({
       ...prev,
       Sections: {
@@ -144,7 +136,6 @@ export default function EditRobot() {
 
   const updateCarSection = (updates) => {
     const { Voltage, Cycles, Status, ...allowedUpdates } = updates;
-    console.log("Updating car section (filtered):", allowedUpdates);
     setRobot((prev) => ({
       ...prev,
       Sections: {
@@ -190,11 +181,9 @@ export default function EditRobot() {
       if (robot.Image instanceof File) {
         // New image uploaded
         formData.append("Image", robot.Image);
-        console.log("Sending new image file:", robot.Image.name);
       } else if (robot.originalImage) {
         // Keep original image - send the filename only
         formData.append("Image", robot.originalImage);
-        console.log("Keeping original image:", robot.originalImage);
       }
 
       // 🔹 Build Sections object
@@ -231,14 +220,8 @@ export default function EditRobot() {
       // 🔹 Append Sections as JSON string
       formData.append("Sections", JSON.stringify(sectionsData));
 
-      console.log("=== SENDING DATA TO SERVER ===");
-      console.log("RobotName:", robot.RobotName);
-      console.log("isTrolley:", robot.isTrolley ? "1" : "0");
-      console.log("Sections:", sectionsData);
-      
-      console.log("FormData contents:");
+     
       for (let [key, value] of formData.entries()) {
-        console.log(`${key}:`, value instanceof File ? `File: ${value.name}` : value);
       }
 
       // 🔹 Send request as POST with method override
@@ -248,7 +231,6 @@ export default function EditRobot() {
       });
 
       const result = await response.json();
-      console.log("Update response:", result);
 
       if (result?.message?.toLowerCase().includes("success")) {
         toast.success("Robot updated successfully!");
@@ -257,7 +239,6 @@ export default function EditRobot() {
         toast.error(result.message || "Failed to update robot info.");
       }
     } catch (err) {
-      console.error("Update error:", err);
       toast.error("Error while updating robot.");
     } finally {
       setSubmitting(false);

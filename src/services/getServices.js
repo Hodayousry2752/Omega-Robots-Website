@@ -9,7 +9,6 @@ export const getData = async (endpoint) => {
     const response = await apiClient.get(endpoint, { headers: { "Cache-Control": "no-cache" } });
     return response.data;
   } catch (error) {
-    console.error("GET Error:", error);
     throw error;
   }
 };
@@ -26,7 +25,6 @@ export const postData = async (endpoint, data) => {
     });
     return response.data;
   } catch (error) {
-    console.error("POST Error:", error);
     throw error;
   }
 };

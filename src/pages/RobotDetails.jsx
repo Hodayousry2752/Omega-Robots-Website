@@ -50,7 +50,6 @@ const loadButtonVisibility = (robotId, section) => {
     const stored = localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : {};
   } catch (error) {
-    console.error("Error loading button visibility:", error);
     return {};
   }
 };
@@ -64,7 +63,6 @@ const loadValueVisibility = (robotId, section) => {
     const stored = localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : {};
   } catch (error) {
-    console.error("Error loading value visibility:", error);
     return {};
   }
 };
@@ -74,7 +72,6 @@ const saveTimerEndTime = (robotId, endTime) => {
     const storageKey = `robot_${robotId}_timer_end`;
     localStorage.setItem(storageKey, endTime.toString());
   } catch (error) {
-    console.error("Error saving timer end time:", error);
   }
 };
 
@@ -84,7 +81,6 @@ const loadTimerEndTime = (robotId) => {
     const saved = localStorage.getItem(storageKey);
     return saved ? parseInt(saved, 10) : null;
   } catch (error) {
-    console.error("Error loading timer end time:", error);
     return null;
   }
 };
@@ -95,7 +91,6 @@ const loadRobotLockState = (robotId) => {
     const stored = localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : { locked: true, unlockedAt: null };
   } catch (error) {
-    console.error("Error loading robot lock state:", error);
     return { locked: true, unlockedAt: null };
   }
 };
@@ -105,7 +100,16 @@ const saveRobotLockState = (robotId, state) => {
     const storageKey = `robot_${robotId}_main_locked`;
     localStorage.setItem(storageKey, JSON.stringify(state));
   } catch (error) {
-    console.error("Error saving robot lock state:", error);
+  }
+};
+
+const loadScheduleVisibility = (robotId) => {
+  try {
+    const storageKey = `robot_${robotId}_schedule_visibility`;
+    const stored = localStorage.getItem(storageKey);
+    return stored ? JSON.parse(stored) : true;
+  } catch (error) {
+    return true;
   }
 };
 
@@ -175,7 +179,6 @@ export default function RobotDetails() {
 
   const fetchUserRobotPassword = useCallback(async () => {
     if (!hasTrolley) {
-      console.log("🚫 Robot only mode - no password required");
       setRobotSectionLocked(false);
       saveRobotLockState(id, { locked: false, unlockedAt: Date.now() });
       setUserPasswordLoading(false);
@@ -183,39 +186,29 @@ export default function RobotDetails() {
     }
     
     if (!userName) {
-      console.log("❌ No userName available, skipping robot password fetch");
       return;
     }
     
     try {
       setUserPasswordLoading(true);
-      console.log("🔐 Fetching robot password for user:", userName);
       
       const users = await getData(`${BASE_URL}/users.php`);
-      console.log("📋 All users:", users);
       
       const currentUser = users.find(user => 
         user.Username && user.Username.trim().toLowerCase() === userName.trim().toLowerCase()
       );
       
-      console.log("👤 Current user found:", currentUser);
       
       if (currentUser) {
         const password = currentUser.mainrobot_password;
         setUserRobotPassword(password);
-        console.log("✅ Robot password loaded for user:", userName, password ? `Has password: ${password}` : "No password");
         
         if (!password || password.trim() === "") {
-          console.log("🔓 Auto-unlocking robot section (no password required)");
           setRobotSectionLocked(false);
           saveRobotLockState(id, { locked: false, unlockedAt: Date.now() });
         }
-      } else {
-        console.warn("❌ Current user not found in users list");
-        console.log("Available usernames:", users.map(u => u.Username));
-      }
+      } 
     } catch (error) {
-      console.error("❌ Failed to fetch user robot password:", error);
     } finally {
       setUserPasswordLoading(false);
     }
@@ -223,7 +216,6 @@ export default function RobotDetails() {
 
   useEffect(() => {
     const lockState = loadRobotLockState(id);
-    console.log("🔒 Loaded lock state for robot:", id, lockState);
     
     if (lockState.locked === false && lockState.unlockedAt) {
       const twentyFourHours = 24 * 60 * 60 * 1000;
@@ -231,9 +223,7 @@ export default function RobotDetails() {
       
       if (timeSinceUnlock < twentyFourHours) {
         setRobotSectionLocked(false);
-        console.log("🔓 Robot section already unlocked (within 24h)");
       } else {
-        console.log("⏰ Lock expired, re-locking robot section");
         setRobotSectionLocked(true);
         saveRobotLockState(id, { locked: true, unlockedAt: null });
       }
@@ -241,34 +231,27 @@ export default function RobotDetails() {
   }, [id]);
 
   const publishStatusMessages = useCallback(() => {
-    console.log("🔄 Publishing status messages via MQTT Context");
     
     let statusSent = false;
     
     const robotSection = robot?.Sections?.main;
     if (robotSection?.Topic_main) {
-      console.log("🤖 Sending status to robot section:", robotSection.Topic_main);
       const success = publishButtonMessage(id, "main", robotSection.Topic_main, "status");
       if (success) {
         statusSent = true;
       } else {
-        console.log("❌ Failed to send status to robot");
       }
     } else {
-      console.log("❌ Robot MQTT topic not available for status message");
     }
     
     const trolleySection = robot?.Sections?.car;
     if (trolleySection?.Topic_main) {
-      console.log("🚗 Sending status to trolley section:", trolleySection.Topic_main);
       const success = publishButtonMessage(id, "car", trolleySection.Topic_main, "status");
       if (success) {
         statusSent = true;
       } else {
-        console.log("❌ Failed to send status to trolley");
       }
     } else {
-      console.log("❌ Trolley MQTT topic not available for status message");
     }
     
     if (statusSent) {
@@ -280,13 +263,11 @@ export default function RobotDetails() {
 
   const fetchRobotData = useCallback(async () => {
     try {
-      console.log("🔄 Fetching robot data for ID:", id);
       
       let robotData;
       if (location.state?.robot) {
         robotData = await getData(`${BASE_URL}/robots/${id}`);
         if (!robotData) {
-          console.warn("Robot not found in API");
           return null;
         }
       } else {
@@ -297,18 +278,14 @@ export default function RobotDetails() {
         }
       }
       
-      console.log("✅ Robot data fetched:", robotData);
       setRobot(robotData);
       
       const robotConnectionStatus = getConnectionStatus(id, "main");
       const trolleyConnectionStatus = getConnectionStatus(id, "car");
       
-      console.log("🤖 Robot MQTT Connection Status:", robotConnectionStatus);
-      console.log("🚗 Trolley MQTT Connection Status:", trolleyConnectionStatus);
       
       return robotData;
     } catch (error) {
-      console.error("❌ Failed to load robot details:", error);
       return null;
     }
   }, [id, location.state, BASE_URL, getConnectionStatus]);
@@ -324,24 +301,19 @@ export default function RobotDetails() {
       });
       setButtonColors(colorsMap);
       setButtonsWithColors(buttonsData);
-      console.log("✅ Button colors updated");
     } catch (err) {
-      console.error("❌ Failed to load button colors:", err);
     }
   }, [BASE_URL]);
 
   const fetchAllData = useCallback(async () => {
     try {
-      console.log("🔄 Auto-refreshing all data...");
       
       const updatedRobot = await fetchRobotData();
       await fetchButtonColors();
       
-      console.log("✅ All data refreshed successfully");
       
       return updatedRobot;
     } catch (error) {
-      console.error("❌ Error in auto-refresh:", error);
       return null;
     }
   }, [fetchRobotData, fetchButtonColors]);
@@ -384,7 +356,6 @@ export default function RobotDetails() {
         setScheduleButton(null);
       }
     } catch (error) {
-      console.error("Error fetching schedule button:", error);
       setScheduleButton(null);
     } finally {
       setScheduleLoading(false);
@@ -406,7 +377,6 @@ export default function RobotDetails() {
         await fetchButtonColors();
         
       } catch (error) {
-        console.error("❌ Error loading initial data:", error);
         toast.error("Failed to load robot details");
       } finally {
         setLoading(false);
@@ -433,7 +403,6 @@ export default function RobotDetails() {
 
     refreshIntervalRef.current = setInterval(() => {
       if (id && !loading) {
-        console.log(" Auto-refreshing all robot data...");
         fetchAllData();
       }
     }, 10000);
@@ -531,7 +500,6 @@ export default function RobotDetails() {
           `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
         );
       } else {
-        console.log("⏰ 24-hour timer completed, sending automatic status messages...");
         publishStatusMessages();
         
         setTimeout(() => {
@@ -557,15 +525,7 @@ export default function RobotDetails() {
 
   useEffect(() => {
     if (robot) {
-      console.log("🤖 Robot data updated:", {
-        robotVoltage: robot.Sections?.main?.Voltage,
-        robotStatus: robot.Sections?.main?.Status,
-        robotCycles: robot.Sections?.main?.Cycles,
-        trolleyVoltage: robot.Sections?.car?.Voltage,
-        trolleyStatus: robot.Sections?.car?.Status,
-        trolleyCycles: robot.Sections?.car?.Cycles,
-        isTrolley: robot.isTrolley 
-      });
+      
     }
   }, [robot]);
 
@@ -574,7 +534,6 @@ export default function RobotDetails() {
     const topic = robotSection?.Topic_main;
     
     if (!topic) {
-      console.error("No topic found for robot section");
       toast.error("No topic configured for robot section");
       return;
     }
@@ -588,7 +547,6 @@ export default function RobotDetails() {
         fetchAllData();
       }, 2000);
     } else {
-      console.log(`Failed to publish to robot ${topic}: ${btnName}`);
       toast.error("Failed to send command via MQTT Check internet connection or contact support");
     }
   };
@@ -598,7 +556,6 @@ export default function RobotDetails() {
     const topic = trolleySection?.Topic_main;
     
     if (!topic) {
-      console.error("No topic found for trolley section");
       toast.error("No topic configured for trolley section");
       return;
     }
@@ -612,7 +569,6 @@ export default function RobotDetails() {
         fetchAllData();
       }, 2000);
     } else {
-      console.log(`Failed to publish to trolley ${topic}: ${btnName}`);
       toast.error("Failed to send command via MQTT Check internet connection or contact support");
     }
   };
@@ -1092,7 +1048,7 @@ export default function RobotDetails() {
                   </div>
 
                   {/* Schedule under trolley section when there IS a trolley */}
-                  {shouldShowScheduleSection() && (
+                  {shouldShowScheduleSection() && loadScheduleVisibility(id) && (
                     <>
                       <div className="mb-6 mt-16">
                         <h2 className="text-2xl sm:text-3xl font-bold text-green-600 text-center">
@@ -1149,7 +1105,7 @@ export default function RobotDetails() {
                     )}
 
                     {/* Schedule under robot section when there is NO trolley */}
-                    {shouldShowRobotSchedule() && (
+                    {shouldShowRobotSchedule() && loadScheduleVisibility(id) && (
                       <div className="mt-12 pt-8 border-t border-gray-200">
                         <div className="mb-6">
                           <h2 className="text-2xl sm:text-3xl font-bold text-green-600 text-center">

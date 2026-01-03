@@ -51,11 +51,9 @@ const createToastInterceptor = () => {
           }
           
           if (isLoginToast(message)) {
-            console.log(`✅ Allowing login toast: ${message}`);
             return originalFunc.apply(this, args);
           }
           
-          console.log(`❌ Blocking non-login toast on login page: ${message}`);
           if (funcName === 'promise') {
             return Promise.resolve();
           }

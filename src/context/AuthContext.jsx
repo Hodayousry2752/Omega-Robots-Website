@@ -64,7 +64,6 @@ export function AuthProvider({ children }) {
       localStorage.setItem("projectName", projectNameValue);
       localStorage.setItem("loginTime", Date.now().toString());
     } catch (error) {
-      console.error("Error saving to localStorage:", error);
     }
   };
 
@@ -76,7 +75,7 @@ export function AuthProvider({ children }) {
     
     clearAllCookies();
     
-    // مسح localStorage (لكن نحتفظ ببيانات Remember Me والاقتراحات)
+    
     try {
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("userRole");
@@ -84,21 +83,16 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("projectName");
       localStorage.removeItem("loginTime");
       
-      // ملاحظة: نحتفظ بـ omega_remember_me و omega_saved_usernames
-      console.log("✅ Logout complete. Remember me data and suggestions preserved.");
+      // omega_remember_me و omega_saved_usernames
     } catch (error) {
-      console.error("Error clearing localStorage:", error);
     }
   };
 
-  // دالة لحذف جميع البيانات المحفوظة (للإعدادات المتقدمة)
   const clearAllSavedData = () => {
     try {
       localStorage.removeItem("omega_remember_me");
       localStorage.removeItem("omega_saved_usernames");
-      console.log("✅ All saved login data cleared");
     } catch (error) {
-      console.error("Error clearing saved data:", error);
     }
   };
 

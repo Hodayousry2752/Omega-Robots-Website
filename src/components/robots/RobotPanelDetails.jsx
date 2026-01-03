@@ -67,7 +67,6 @@ export default function RobotMainPanelView({
       const stored = localStorage.getItem(getStorageKey());
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.error("Error loading button visibility:", error);
       return {};
     }
   };
@@ -78,7 +77,6 @@ export default function RobotMainPanelView({
       const stored = localStorage.getItem(getValueStorageKey());
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.error("Error loading value visibility:", error);
       return {};
     }
   };
@@ -88,7 +86,6 @@ export default function RobotMainPanelView({
     try {
       localStorage.setItem(getStorageKey(), JSON.stringify(visibilityMap));
     } catch (error) {
-      console.error("Error saving button visibility:", error);
     }
   };
 
@@ -97,7 +94,6 @@ export default function RobotMainPanelView({
     try {
       localStorage.setItem(getValueStorageKey(), JSON.stringify(visibilityMap));
     } catch (error) {
-      console.error("Error saving value visibility:", error);
     }
   };
 
@@ -111,7 +107,6 @@ export default function RobotMainPanelView({
         return JSON.parse(mainSection.ActiveBtns);
       }
     } catch (error) {
-      console.error("Error parsing ActiveBtns:", error);
     }
     return [];
   };
@@ -124,13 +119,11 @@ export default function RobotMainPanelView({
   };
 
   const handleButtonClick = (btnName) => {
-    console.log("🤖 Robot Button Clicked:", btnName);
     
     if (publish) {
       publish(btnName);
       toast.success(`Sent: ${btnName}`);
     } else {
-      console.log(`Would publish robot button: ${btnName}`);
       toast.info(`Would send: ${btnName}`);
     }
   };
@@ -140,7 +133,6 @@ export default function RobotMainPanelView({
     try {
       setUpdatingButtons(prev => ({ ...prev, [buttonId]: true }));
       
-      console.log("Updating button visibility in localStorage:", { buttonId, buttonName, isVisible });
       
       // Load current visibility
       const currentVisibility = loadButtonVisibility();
@@ -177,7 +169,6 @@ export default function RobotMainPanelView({
       toast.success(isVisible ? "Button is now visible to users" : "Button is now hidden from users");
       
     } catch (err) {
-      console.error("Error updating button visibility:", err);
       toast.error("Failed to update button visibility");
     } finally {
       setTimeout(() => {
@@ -191,7 +182,6 @@ export default function RobotMainPanelView({
     try {
       setUpdatingValues(prev => ({ ...prev, [valueId]: true }));
       
-      console.log("Updating value visibility in localStorage:", { valueId, valueName, isVisible });
       
       // Load current visibility
       const currentVisibility = loadValueVisibility();
@@ -208,7 +198,6 @@ export default function RobotMainPanelView({
       toast.success(isVisible ? `${valueName} is now visible to users` : `${valueName} is now hidden from users`);
       
     } catch (err) {
-      console.error("Error updating value visibility:", err);
       toast.error("Failed to update value visibility");
     } finally {
       setTimeout(() => {

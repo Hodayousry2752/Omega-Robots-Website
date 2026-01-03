@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
-import {getData } from "@/services/getServices";
 import { postData} from "@/services/postServices";
-import { useParams } from "react-router-dom";
 import mqtt from "mqtt";
 import { toast } from "sonner";
 
@@ -47,53 +45,34 @@ const publishWithCredentials = async (mqttUrl, mqttUsername, mqttPassword, topic
 export default function ScheduleSettings({
   schedule = { days: [], hour: 8, minute: 0 },
   setSchedule = () => {},
-  projectId
+  projectId,
+  robotData,
+  section = "car" // Default to car for backward compatibility
 }) {
-  const { id: robotId } = useParams(); 
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Nun"];
   const [saving, setSaving] = useState(false);
   const [updatingVisibility, setUpdatingVisibility] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [robotData, setRobotData] = useState(null);
-  const [robotLoading, setRobotLoading] = useState(true);
   
   const size = 200;
   const radius = size / 2 - 20;
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-  // Fetch robot data
-  useEffect(() => {
-    const fetchRobotData = async () => {
-      if (!robotId) return;
-      
-      try {
-        setRobotLoading(true);
-        const data = await getData(`${BASE_URL}/robots/${robotId}`);
-        setRobotData(data);
-      } catch (err) {
-        console.error('Error fetching robot data:', err);
-      } finally {
-        setRobotLoading(false);
-      }
-    };
-
-    fetchRobotData();
-  }, [robotId, BASE_URL]);
-
-  // Get MQTT credentials from car section
+  // Get MQTT credentials from the specified section
   const getMqttCredentials = () => {
-    if (!robotData?.Sections?.car) return null;
+    if (!robotData?.Sections?.[section]) return null;
     
-    const carSection = robotData.Sections.car;
+    const selectedSection = robotData.Sections[section];
     return {
-      mqttUrl: carSection.mqttUrl,
-      mqttUsername: carSection.mqttUsername,
-      mqttPassword: carSection.mqttPassword,
-      topic: carSection.Topic_main
+      mqttUrl: selectedSection.mqttUrl,
+      mqttUsername: selectedSection.mqttUsername,
+      mqttPassword: selectedSection.mqttPassword,
+      topic: selectedSection.Topic_main
     };
   };
 
   const mqttCredentials = getMqttCredentials();
+  const robotId = robotData?.id;
 
   // Get storage key for schedule visibility
   const getScheduleVisibilityKey = () => `robot_${robotId}_schedule_visibility`;
@@ -104,7 +83,6 @@ export default function ScheduleSettings({
       const stored = localStorage.getItem(getScheduleVisibilityKey());
       return stored ? JSON.parse(stored) : true;
     } catch (error) {
-      console.error("Error loading schedule visibility:", error);
       return true;
     }
   };
@@ -114,7 +92,6 @@ export default function ScheduleSettings({
     try {
       localStorage.setItem(getScheduleVisibilityKey(), JSON.stringify(isVisible));
     } catch (error) {
-      console.error("Error saving schedule visibility:", error);
     }
   };
 
@@ -123,9 +100,7 @@ export default function ScheduleSettings({
     try {
       setUpdatingVisibility(true);
       saveScheduleVisibility(isVisible);
-      console.log(isVisible ? "Schedule is now visible to users" : "Schedule is now hidden from users");
     } catch (err) {
-      console.error("Error updating schedule visibility:", err);
     } finally {
       setTimeout(() => {
         setUpdatingVisibility(false);
@@ -229,9 +204,7 @@ export default function ScheduleSettings({
           );
           
           mqttSuccess = true;
-          console.log(`Schedule sent via MQTT: ${message} to topic: ${mqttCredentials.topic}`);
         } catch (mqttError) {
-          console.error("MQTT publish failed:", mqttError);
         }
       }
 
@@ -252,7 +225,8 @@ export default function ScheduleSettings({
         projectId: projectId,
       };
 
-      // await postData(`${BASE_URL}/buttons.php?section=car`, newButton);
+      // Note: You might want to change the endpoint based on section
+      // await postData(`${BASE_URL}/buttons.php?section=${section}`, newButton);
       
       const successMessage = mqttSuccess 
         ? "Schedule sent successfully via MQTT"
@@ -261,7 +235,6 @@ export default function ScheduleSettings({
       toast.success(successMessage);
       
     } catch (err) {
-      console.error("Failed to save schedule:", err);
       toast.error("Failed to save schedule");
     } finally {
       setSaving(false);
@@ -274,7 +247,7 @@ export default function ScheduleSettings({
 
   const isVisible = isScheduleVisible();
 
-  if (robotLoading) {
+  if (!robotData) {
     return (
       <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
         <div className="text-center py-4">

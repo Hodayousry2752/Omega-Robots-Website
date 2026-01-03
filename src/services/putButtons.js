@@ -16,8 +16,7 @@ export const putButtons = async (robotId, buttons) => {
       (btn) => String(btn.RobotId) === String(robotId)
     );
 
-    console.log(" Current buttons:", currentButtons);
-    console.log(" New buttons to sync:", buttons);
+    
 
     const normalize = (b) => (b.BtnName ?? b.name ?? "").toLowerCase();
 
@@ -36,7 +35,6 @@ export const putButtons = async (robotId, buttons) => {
     for (const btn of toDelete) {
       const delId = btn.id ?? btn.BtnID ?? btn.BtnId;
       if (delId) {
-        console.log(` Deleting button ${btn.BtnName} (id: ${delId})`);
         requests.push(apiClient.delete(`buttons.php/${delId}`));
       }
     }
@@ -48,7 +46,6 @@ export const putButtons = async (robotId, buttons) => {
         Color: btn.Color ?? null,
         Operation: btn.Operation ?? "/start",
       };
-      console.log(` Adding new button:`, payload);
       requests.push(apiClient.post(`buttons.php`, payload));
     }
 
@@ -63,21 +60,17 @@ export const putButtons = async (robotId, buttons) => {
           Color: existing.Color,
           Operation: existing.Operation ?? "/start",
         };
-        console.log(` Keeping existing button: ${existing.BtnName}`);
         requests.push(apiClient.put(`buttons.php/${existing.id}`, payload));
       }
     }
 
     if (requests.length > 0) {
       await Promise.all(requests);
-      console.log(" Buttons synced successfully for robot", robotId);
     } else {
-      console.log(" No button changes detected");
     }
 
     return { success: true };
   } catch (error) {
-    console.error(" putButtons error:", error.response?.data || error.message);
     throw error;
   }
 };

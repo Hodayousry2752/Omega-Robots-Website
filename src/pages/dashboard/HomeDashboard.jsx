@@ -176,7 +176,6 @@ export default function HomeDashboard() {
         setProjects(projectsData || []);
         setAllRobots(robotsData || []);
       } catch (error) {
-        console.error("Failed to fetch data:", error);
         toast.error("Failed to load projects");
       }
     };
@@ -307,7 +306,6 @@ export default function HomeDashboard() {
         toast.error(response?.message || "Failed to delete all projects.");
       }
     } catch (error) {
-      console.error("Error deleting all projects:", error);
       toast.error("Error deleting all projects. Please try again.");
     } finally {
       setDeleteAll(false);
@@ -336,7 +334,6 @@ export default function HomeDashboard() {
         toast.error(response?.message || "Failed to delete project.");
       }
     } catch (error) {
-      console.error("Error deleting project:", error);
       toast.error("Error deleting project. Please try again.");
     } finally {
       setProjectToDelete(null);

@@ -35,7 +35,6 @@ export default function NotificationsTab({ robotId, sectionName }) {
       
       return { date: jordanDate, time: jordanTimeStr };
     } catch (error) {
-      console.error("Error converting time:", error);
       return { date: dateStr, time: timeStr };
     }
   };
@@ -87,7 +86,6 @@ export default function NotificationsTab({ robotId, sectionName }) {
     const topic = robot.Sections[sectionName].Topic_main;
 
     const filtered = notesData.filter((note) => note.topic_main === topic);
-console.log(filtered)
     const sorted = filtered.sort((a, b) => {
       const dateTimeA = new Date(`${a.date}T${a.time}`);
       const dateTimeB = new Date(`${b.date}T${b.time}`);
@@ -116,7 +114,6 @@ console.log(filtered)
 
       const filtered = filterNotesBySection(allNotes, robot, sectionName);
       setFilteredNotes(filtered);
-      console.log("lkjhgfdsdfghjk",filtered)
     } catch (err) {
       setError(`Failed to load notifications or robot data: ${err.message}`);
     } finally {
